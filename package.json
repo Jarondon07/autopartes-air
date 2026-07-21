@@ -1,0 +1,25 @@
+{
+  "name": "autopartes-air",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sistema de gestión de compra, venta e inventario de repuestos automotrices",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"npm run dev -w @autopartes-air/server\" \"npm run dev -w @autopartes-air/web\"",
+    "dev:server": "npm run dev -w @autopartes-air/server",
+    "dev:web": "npm run dev -w @autopartes-air/web",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run db:generate -w @autopartes-air/server",
+    "db:migrate": "npm run db:migrate -w @autopartes-air/server",
+    "db:seed": "npm run db:seed -w @autopartes-air/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

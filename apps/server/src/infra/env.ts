@@ -1,0 +1,44 @@
+import { resolve } from 'node:path';
+import { config as loadDotenv } from 'dotenv';
+import { z } from 'zod';
+
+/**
+ * Carga de variables de entorno del sistema.
+ *
+ * Convención de archivos (relativos al cwd del paquete server):
+ *   - producción  → `.env`
+ *   - desarrollo/test → `.env.local`
+ *
+ * El modo se toma de `NODE_ENV` (definido por el runtime, no por el archivo).
+ * Si no está definido, se asume `development` y se carga `.env.local`.
+ */
+const mode = process.env.NODE_ENV ?? 'development';
+const envFile = mode === 'production' ? '.env' : '.env.local';
+
+loadDotenv({ path: resolve(process.cwd(), envFile) });
+
+const envSchema = z.object({
+  PORT: z.coerce.number().int().default(3000),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL es requerida'),
+  JWT_ACCESS_SECRET: z.string().min(16, 'JWT_ACCESS_SECRET muy corto'),
+  JWT_REFRESH_SECRET: z.string().min(16, 'JWT_REFRESH_SECRET muy corto'),
+  JWT_ACCESS_TTL: z.string().default('15m'),
+  JWT_REFRESH_TTL: z.string().default('7d'),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error(`❌ Variables de entorno inválidas (archivo: ${envFile}):`);
+  console.error(parsed.error.flatten().fieldErrors);
+  process.exit(1);
+}
+
+/** Todas las variables del sistema, validadas y tipadas. */
+export const env = parsed.data;
+export const isProd = env.NODE_ENV === 'production';
+export const isDev = env.NODE_ENV === 'development';
+/** Archivo de entorno efectivamente cargado (útil para logs de arranque). */
+export const loadedEnvFile = envFile;

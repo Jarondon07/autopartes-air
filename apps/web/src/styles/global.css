@@ -1,0 +1,74 @@
+/* Fuente Inter self-hosted (offline-safe), pesos usados por AdminKit */
+@import '@fontsource/inter/300.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/600.css';
+
+/* Reset mínimo — AntD ya trae su propio reset (CSS-in-JS) */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f5f7fb;
+  font-family: 'Inter', 'Helvetica Neue', Arial, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, sans-serif;
+}
+
+/* Headings ligeros y negros, como AdminKit */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #000;
+  font-weight: 400;
+}
+
+/* Scrollbar fino */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* -------- Sidebar estilo AdminKit -------- */
+
+/* Borde izquierdo azul de 3px en el item de menú activo (detalle AdminKit
+   que el Menu de AntD no da nativo). Se aplica dentro del Sider. */
+.app-sidebar .ant-menu-item-selected {
+  border-left: 3px solid #3b7ddd;
+  background: linear-gradient(
+    90deg,
+    rgba(59, 125, 221, 0.1) 0%,
+    rgba(59, 125, 221, 0) 100%
+  ) !important;
+}
+
+/* Items sin selección: reservar el ancho del borde para que no "salten" */
+.app-sidebar .ant-menu-item,
+.app-sidebar .ant-menu-submenu-title {
+  border-left: 3px solid transparent;
+}
+
+/* Headers de sección del sidebar */
+.app-sidebar .ant-menu-item-group-title {
+  color: #ced4da;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding-top: 16px;
+}
