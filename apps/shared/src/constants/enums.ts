@@ -22,14 +22,33 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 export const DOCUMENT_TYPES = ['V', 'J', 'E', 'P', 'G'] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
-export const EXCHANGE_RATE_SOURCES = ['bcv', 'paralelo'] as const;
+export const EXCHANGE_RATE_SOURCES = [
+  'bcv',
+  'euro',
+  'intervencion',
+  'usdt',
+] as const;
 export type ExchangeRateSource = (typeof EXCHANGE_RATE_SOURCES)[number];
+
+export const EXCHANGE_RATE_SOURCE_LABELS: Record<ExchangeRateSource, string> = {
+  bcv: 'BCV (USD)',
+  euro: 'Euro (BCV)',
+  intervencion: 'Intervención',
+  usdt: 'USDT (Paralelo)',
+};
 
 export const SALE_STATUSES = ['completada', 'anulada'] as const;
 export type SaleStatus = (typeof SALE_STATUSES)[number];
 
 export const MOVEMENT_TYPES = ['compra', 'venta', 'ajuste', 'anulacion'] as const;
 export type MovementType = (typeof MOVEMENT_TYPES)[number];
+
+export const MOVEMENT_TYPE_LABELS: Record<MovementType, string> = {
+  compra: 'Compra',
+  venta: 'Venta',
+  ajuste: 'Ajuste',
+  anulacion: 'Anulación',
+};
 
 /** IVA vigente por defecto (%). Cada venta guarda su propio snapshot. */
 export const DEFAULT_IVA_PCT = 16;

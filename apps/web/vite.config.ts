@@ -10,6 +10,11 @@ export default defineConfig({
         target: 'http://localhost:4300',
         changeOrigin: true,
       },
+      // Archivos subidos (logos, imágenes) servidos por la API.
+      '/uploads': {
+        target: 'http://localhost:4300',
+        changeOrigin: true,
+      },
     },
   },
 });

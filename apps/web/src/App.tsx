@@ -1,22 +1,53 @@
+import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
-import { ALL_NAV_ITEMS } from './components/layout/nav.config';
+import { NAV_LEAVES, type NavLeaf } from './components/layout/nav.config';
 import { ProtectedRoute } from './components/routing/ProtectedRoute';
 import { RequirePermission } from './components/routing/RequirePermission';
 import { useSessionBootstrap } from './hooks/useAuth';
-import { PERMISSIONS } from '@autopartes-air/shared';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { ProductsPage } from './pages/products/ProductsPage';
+import { CategoriesPage } from './pages/categories/CategoriesPage';
+import { ClientsPage } from './pages/clients/ClientsPage';
+import { SuppliersPage } from './pages/suppliers/SuppliersPage';
+import { ExchangeRatesPage } from './pages/exchange-rates/ExchangeRatesPage';
+import { InventoryPage } from './pages/inventory/InventoryPage';
+import { PurchasesPage } from './pages/purchases/PurchasesPage';
+import { CajeroPage } from './pages/sales/CajeroPage';
+import { SalesListPage } from './pages/sales/SalesListPage';
+import { UsersPage } from './pages/config/UsersPage';
+import { RolesPage } from './pages/config/RolesPage';
+import { CarBrandsPage } from './pages/config/CarBrandsPage';
+import { TaxesPage } from './pages/config/TaxesPage';
 
-/** Módulos ya implementados: no usan PlaceholderPage. */
-const IMPLEMENTED_PATHS = new Set(['/', '/productos']);
+/** Páginas ya implementadas, por ruta. El resto usa PlaceholderPage. */
+const IMPLEMENTED: Record<string, ReactNode> = {
+  '/productos': <ProductsPage />,
+  '/inventario': <InventoryPage />,
+  '/compras': <PurchasesPage />,
+  '/ventas/caja': <CajeroPage />,
+  '/ventas': <SalesListPage />,
+  '/clientes': <ClientsPage />,
+  '/proveedores': <SuppliersPage />,
+  '/configuracion/usuarios': <UsersPage />,
+  '/configuracion/roles': <RolesPage />,
+  '/configuracion/categorias': <CategoriesPage />,
+  '/configuracion/marcas-vehiculos': <CarBrandsPage />,
+  '/configuracion/tasas': <ExchangeRatesPage />,
+  '/configuracion/impuestos': <TaxesPage />,
+};
 
-/** Rutas de módulos aún no implementados → PlaceholderPage. */
-const PLACEHOLDER_ROUTES = ALL_NAV_ITEMS.filter(
-  (it) => !IMPLEMENTED_PATHS.has(it.path),
-);
+/** Envuelve el elemento con control de permiso si la hoja lo requiere. */
+function leafElement(leaf: NavLeaf): ReactNode {
+  const element = IMPLEMENTED[leaf.path] ?? <PlaceholderPage title={leaf.label} />;
+  if (!leaf.permission) return element;
+  return (
+    <RequirePermission permission={leaf.permission}>{element}</RequirePermission>
+  );
+}
 
 export function App() {
   const { isLoading } = useSessionBootstrap();
@@ -28,20 +59,10 @@ export function App() {
       <Route element={<ProtectedRoute bootstrapping={isLoading} />}>
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
-          <Route
-            path="/productos"
-            element={
-              <RequirePermission permission={PERMISSIONS.PRODUCTS_READ}>
-                <ProductsPage />
-              </RequirePermission>
-            }
-          />
-          {PLACEHOLDER_ROUTES.map((it) => (
-            <Route
-              key={it.key}
-              path={it.path}
-              element={<PlaceholderPage title={it.label} />}
-            />
+          {/* Perfil: accesible por cualquier usuario autenticado (no está en el menú) */}
+          <Route path="/perfil" element={<ProfilePage />} />
+          {NAV_LEAVES.filter((leaf) => leaf.path !== '/').map((leaf) => (
+            <Route key={leaf.key} path={leaf.path} element={leafElement(leaf)} />
           ))}
         </Route>
       </Route>

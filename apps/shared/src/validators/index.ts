@@ -8,3 +8,5 @@ export * from './supplier';
 export * from './exchange-rate';
 export * from './purchase';
 export * from './sale';
+export * from './inventory';
+export * from './tax';

@@ -7,9 +7,9 @@ import type {
 } from '@autopartes-air/shared';
 import { api } from './client';
 
-/** Producto con sus vehículos compatibles (respuesta de detalle). */
+/** Producto con sus modelos de carro compatibles (respuesta de detalle). */
 export interface ProductDetail extends Product {
-  vehicleIds: number[];
+  carModelIds: number[];
 }
 
 export interface ProductsPage {

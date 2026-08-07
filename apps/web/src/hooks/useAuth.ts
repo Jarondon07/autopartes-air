@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import type { LoginInput } from '@autopartes-air/shared';
+import type {
+  ChangePasswordInput,
+  LoginInput,
+  UpdateProfileInput,
+} from '@autopartes-air/shared';
 import * as authApi from '../api/auth.api';
 import { useAuthStore } from '../stores/auth.store';
 
@@ -20,6 +24,22 @@ export function useLogout() {
     mutationFn: () => authApi.logout(),
     // Limpiar siempre, aunque el logout del servidor falle.
     onSettled: () => clear(),
+  });
+}
+
+/** Actualiza el perfil propio y refresca el usuario en el store. */
+export function useUpdateProfile() {
+  const setUser = useAuthStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: (input: UpdateProfileInput) => authApi.updateProfile(input),
+    onSuccess: (user) => setUser(user),
+  });
+}
+
+/** Cambia la contraseña propia. */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: ChangePasswordInput) => authApi.changePassword(input),
   });
 }
 

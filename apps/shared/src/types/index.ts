@@ -62,12 +62,39 @@ export interface LoginResponse {
 export interface Category {
   id: number;
   name: string;
+  abbreviation: string | null;
   description: string | null;
+  isActive: boolean;
 }
 
 export interface Brand {
   id: number;
   name: string;
+}
+
+export interface Tax {
+  id: number;
+  name: string;
+  rate: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CarBrand {
+  id: number;
+  name: string;
+  abbreviation: string | null;
+  logoUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CarModel {
+  id: number;
+  brandId: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export interface Vehicle {
@@ -81,16 +108,21 @@ export interface Vehicle {
 export interface Product {
   id: number;
   code: string;
+  partNumber: string;
   name: string;
+  shortDescription: string | null;
   description: string | null;
   categoryId: number | null;
   brandId: number | null;
+  carBrandId: number | null;
   costUsd: string;
   markupPct: string;
   priceUsd: string;
   stock: number;
   minStock: number;
   location: string | null;
+  yearFrom: number | null;
+  yearTo: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

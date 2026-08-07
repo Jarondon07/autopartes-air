@@ -5,6 +5,7 @@ import {
   PERMISSIONS,
   createExchangeRateSchema,
   paginationSchema,
+  type ExchangeRateSource,
 } from '@autopartes-air/shared';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/rbac';
@@ -41,7 +42,7 @@ exchangeRatesRouter.get(
       const { page, limit, source } = req.query as unknown as {
         page: number;
         limit: number;
-        source?: 'bcv' | 'paralelo';
+        source?: ExchangeRateSource;
       };
       const { rows, total } = await service.list({ page, limit, source });
       paginated(res, rows, { page, limit, total });

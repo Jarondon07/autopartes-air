@@ -5,8 +5,10 @@ import type { AuthUser, PermissionCode, RoleName } from '@autopartes-air/shared'
 import { env } from '../../infra/env';
 import { db } from '../../infra/db';
 import { permissions, rolePermissions, roles, users } from '../../db/schema';
-import { unauthorized } from '../../middleware/error';
+import { badRequest, unauthorized } from '../../middleware/error';
 import type { AccessTokenPayload } from '../../middleware/auth';
+
+const BCRYPT_ROUNDS = 10;
 
 interface RefreshTokenPayload {
   sub: number;
@@ -101,4 +103,32 @@ export async function refresh(refreshToken: string) {
 
 export async function me(userId: number): Promise<AuthUser> {
   return getAuthUser(userId);
+}
+
+/** Actualiza el perfil propio (por ahora, solo el nombre completo). */
+export async function updateProfile(userId: number, fullName: string): Promise<AuthUser> {
+  await db
+    .update(users)
+    .set({ fullName, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+  return getAuthUser(userId);
+}
+
+/** Cambia la contraseña propia, validando la contraseña actual. */
+export async function changePassword(
+  userId: number,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const [row] = await db.select().from(users).where(eq(users.id, userId));
+  if (!row) throw unauthorized('Usuario inexistente');
+
+  const ok = await bcrypt.compare(currentPassword, row.passwordHash);
+  if (!ok) throw badRequest('La contraseña actual es incorrecta');
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, userId));
 }

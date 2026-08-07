@@ -1,63 +1,68 @@
-import { and, asc, eq, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
-import type {
-  CreateProductInput,
-  ProductFilters,
-  UpdateProductInput,
+import { and, asc, eq, ilike, lte, or, sql, type SQL } from 'drizzle-orm';
+import {
+  buildProductSku,
+  type CreateProductInput,
+  type ProductFilters,
+  type UpdateProductInput,
 } from '@autopartes-air/shared';
 import { db } from '../../infra/db';
-import { products, productVehicles } from '../../db/schema';
+import { carBrands, categories, productCarModels, products } from '../../db/schema';
 import { notFound } from '../../middleware/error';
 import { withUniqueGuard } from '../../lib/db-errors';
 
-const DUP_CODE = 'Ya existe un producto con ese código';
+const DUP_CODE = 'Ya existe un producto con ese número de pieza';
 
 /** Ejecutor de consultas: la conexión global o una transacción activa. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** IDs de vehículos compatibles asociados a un producto. */
-async function getVehicleIds(exec: Executor, productId: number): Promise<number[]> {
-  const rows = await exec
-    .select({ vehicleId: productVehicles.vehicleId })
-    .from(productVehicles)
-    .where(eq(productVehicles.productId, productId));
-  return rows.map((r) => r.vehicleId);
+/** Abreviaturas de categoría y marca del carro para armar el SKU. */
+async function skuParts(exec: Executor, categoryId?: number | null, carBrandId?: number | null) {
+  let categoryAbbr: string | null = null;
+  let carBrandAbbr: string | null = null;
+  if (categoryId) {
+    const [c] = await exec
+      .select({ a: categories.abbreviation })
+      .from(categories)
+      .where(eq(categories.id, categoryId));
+    categoryAbbr = c?.a ?? null;
+  }
+  if (carBrandId) {
+    const [b] = await exec
+      .select({ a: carBrands.abbreviation })
+      .from(carBrands)
+      .where(eq(carBrands.id, carBrandId));
+    carBrandAbbr = b?.a ?? null;
+  }
+  return { categoryAbbr, carBrandAbbr };
 }
 
-/** Reemplaza el set de vehículos compatibles de un producto. */
-async function setVehicles(
-  tx: Executor,
-  productId: number,
-  vehicleIds: number[],
-): Promise<void> {
-  await tx.delete(productVehicles).where(eq(productVehicles.productId, productId));
-  if (vehicleIds.length > 0) {
+/** IDs de modelos de carro a los que sirve un producto. */
+async function getCarModelIds(exec: Executor, productId: number): Promise<number[]> {
+  const rows = await exec
+    .select({ carModelId: productCarModels.carModelId })
+    .from(productCarModels)
+    .where(eq(productCarModels.productId, productId));
+  return rows.map((r) => r.carModelId);
+}
+
+/** Reemplaza el set de modelos de carro de un producto. */
+async function setCarModels(tx: Executor, productId: number, carModelIds: number[]): Promise<void> {
+  await tx.delete(productCarModels).where(eq(productCarModels.productId, productId));
+  if (carModelIds.length > 0) {
     await tx
-      .insert(productVehicles)
-      .values(vehicleIds.map((vehicleId) => ({ productId, vehicleId })));
+      .insert(productCarModels)
+      .values(carModelIds.map((carModelId) => ({ productId, carModelId })));
   }
 }
 
 export async function list(f: ProductFilters) {
   const conditions: SQL[] = [];
   if (f.q) {
-    conditions.push(
-      or(ilike(products.name, `%${f.q}%`), ilike(products.code, `%${f.q}%`))!,
-    );
+    conditions.push(or(ilike(products.name, `%${f.q}%`), ilike(products.code, `%${f.q}%`))!);
   }
   if (f.categoryId) conditions.push(eq(products.categoryId, f.categoryId));
   if (f.brandId) conditions.push(eq(products.brandId, f.brandId));
   if (f.isActive !== undefined) conditions.push(eq(products.isActive, f.isActive));
-  if (f.vehicleId) {
-    conditions.push(
-      inArray(
-        products.id,
-        db
-          .select({ id: productVehicles.productId })
-          .from(productVehicles)
-          .where(eq(productVehicles.vehicleId, f.vehicleId)),
-      ),
-    );
-  }
 
   const where = conditions.length ? and(...conditions) : undefined;
   const offset = (f.page - 1) * f.limit;
@@ -103,35 +108,53 @@ export async function lowStock() {
 export async function getById(id: number) {
   const [product] = await db.select().from(products).where(eq(products.id, id));
   if (!product) throw notFound('Producto no encontrado');
-  const vehicleIds = await getVehicleIds(db, id);
-  return { ...product, vehicleIds };
+  const carModelIds = await getCarModelIds(db, id);
+  return { ...product, carModelIds };
 }
 
 export async function create(input: CreateProductInput) {
-  const { vehicleIds, costUsd, markupPct, ...rest } = input;
+  const { carModelIds, costUsd, markupPct, code: _ignore, partNumber, ...rest } = input;
   return withUniqueGuard(DUP_CODE, () =>
     db.transaction(async (tx) => {
+      const { categoryAbbr, carBrandAbbr } = await skuParts(tx, rest.categoryId, rest.carBrandId);
+      const code = buildProductSku(categoryAbbr, carBrandAbbr, partNumber);
       const [product] = await tx
         .insert(products)
         .values({
           ...rest,
-          costUsd: costUsd.toString(),
+          partNumber: partNumber.trim(),
+          code,
+          // El costo llega con la compra; si no se da al crear, queda en 0.
+          ...(costUsd !== undefined && { costUsd: costUsd.toString() }),
           markupPct: markupPct.toString(),
         })
         .returning();
       if (!product) throw new Error('No se pudo crear el producto');
-      await setVehicles(tx, product.id, vehicleIds ?? []);
-      return { ...product, vehicleIds: vehicleIds ?? [] };
+      await setCarModels(tx, product.id, carModelIds ?? []);
+      return { ...product, carModelIds: carModelIds ?? [] };
     }),
   );
 }
 
 export async function update(id: number, input: UpdateProductInput) {
-  const { vehicleIds, costUsd, markupPct, ...rest } = input;
+  const { carModelIds, costUsd, markupPct, code: _ignore, partNumber, ...rest } = input;
   return withUniqueGuard(DUP_CODE, () =>
     db.transaction(async (tx) => {
       const [existing] = await tx.select().from(products).where(eq(products.id, id));
       if (!existing) throw notFound('Producto no encontrado');
+
+      // Recalcula el código si cambió el número de pieza, la categoría o la marca del carro.
+      let codeUpdate: { code?: string; partNumber?: string } = {};
+      if (partNumber !== undefined || rest.categoryId !== undefined || rest.carBrandId !== undefined) {
+        const categoryId = rest.categoryId !== undefined ? rest.categoryId : existing.categoryId;
+        const carBrandId = rest.carBrandId !== undefined ? rest.carBrandId : existing.carBrandId;
+        const pn = partNumber !== undefined ? partNumber : existing.partNumber;
+        const { categoryAbbr, carBrandAbbr } = await skuParts(tx, categoryId, carBrandId);
+        codeUpdate = {
+          code: buildProductSku(categoryAbbr, carBrandAbbr, pn),
+          ...(partNumber !== undefined && { partNumber: partNumber.trim() }),
+        };
+      }
 
       const [product] = await tx
         .update(products)
@@ -139,18 +162,19 @@ export async function update(id: number, input: UpdateProductInput) {
           ...rest,
           ...(costUsd !== undefined && { costUsd: costUsd.toString() }),
           ...(markupPct !== undefined && { markupPct: markupPct.toString() }),
+          ...codeUpdate,
           updatedAt: new Date(),
         })
         .where(eq(products.id, id))
         .returning();
       if (!product) throw notFound('Producto no encontrado');
 
-      if (vehicleIds !== undefined) {
-        await setVehicles(tx, id, vehicleIds);
+      if (carModelIds !== undefined) {
+        await setCarModels(tx, id, carModelIds);
       }
       return {
         ...product,
-        vehicleIds: vehicleIds ?? (await getVehicleIds(tx, id)),
+        carModelIds: carModelIds ?? (await getCarModelIds(tx, id)),
       };
     }),
   );

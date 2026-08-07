@@ -22,6 +22,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { Product } from '@autopartes-air/shared';
 import { PERMISSIONS, formatUsd } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
+import { categoryOptions } from '../../lib/categories';
 import { useBrands, useCategories } from '../../hooks/useCatalogs';
 import { useDeleteProduct, useProducts } from '../../hooks/useProducts';
 import { useAuthStore } from '../../stores/auth.store';
@@ -214,10 +215,7 @@ export function ProductsPage() {
               style={{ width: '100%' }}
               placeholder="Categoría"
               loading={categories.isLoading}
-              options={(categories.data ?? []).map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
+              options={categoryOptions(categories.data ?? [])}
               onChange={(categoryId) =>
                 setFilters((f) => ({ ...f, categoryId, page: 1 }))
               }

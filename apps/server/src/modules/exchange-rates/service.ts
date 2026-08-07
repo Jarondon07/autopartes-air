@@ -1,10 +1,12 @@
 import { and, desc, eq, sql, type SQL } from 'drizzle-orm';
-import type {
-  CreateExchangeRateInput,
-  ExchangeRateSource,
+import {
+  EXCHANGE_RATE_SOURCES,
+  type CreateExchangeRateInput,
+  type ExchangeRateSource,
 } from '@autopartes-air/shared';
 import { db } from '../../infra/db';
 import { exchangeRates } from '../../db/schema';
+import { env } from '../../infra/env';
 import { withUniqueGuard } from '../../lib/db-errors';
 
 const DUP = 'Ya existe una tasa registrada para esa fecha y fuente';
@@ -19,13 +21,26 @@ async function latestForSource(source: ExchangeRateSource) {
   return row ?? null;
 }
 
-/** Última tasa vigente para cada fuente (BCV y paralelo). */
+/** Última tasa vigente para cada una de las fuentes configuradas. */
 export async function current() {
-  const [bcv, paralelo] = await Promise.all([
-    latestForSource('bcv'),
-    latestForSource('paralelo'),
-  ]);
-  return { bcv, paralelo };
+  const entries = await Promise.all(
+    EXCHANGE_RATE_SOURCES.map(
+      async (source) => [source, await latestForSource(source)] as const,
+    ),
+  );
+  return Object.fromEntries(entries) as Record<
+    ExchangeRateSource,
+    Awaited<ReturnType<typeof latestForSource>>
+  >;
+}
+
+/**
+ * Tasa BCV vigente como número, con fallback de emergencia si no hay ninguna
+ * registrada (útil para cálculos de ventas/compras). Ver BCV_FALLBACK_RATE.
+ */
+export async function getBcvRate(): Promise<number> {
+  const row = await latestForSource('bcv');
+  return row ? Number(row.rateBsPerUsd) : env.BCV_FALLBACK_RATE;
 }
 
 interface ListParams {

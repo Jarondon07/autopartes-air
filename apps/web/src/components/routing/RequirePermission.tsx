@@ -4,15 +4,18 @@ import type { PermissionCode } from '@autopartes-air/shared';
 import { useAuthStore } from '../../stores/auth.store';
 
 interface Props {
-  permission: PermissionCode;
+  /** Permiso requerido. Si es un array, basta con tener uno de ellos. */
+  permission: PermissionCode | PermissionCode[];
   children: ReactNode;
 }
 
-/** Renderiza `children` solo si el usuario tiene el permiso; si no, un 403. */
+/** Renderiza `children` solo si el usuario tiene el/los permiso(s); si no, un 403. */
 export function RequirePermission({ permission, children }: Props) {
-  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const user = useAuthStore((s) => s.user);
+  const required = Array.isArray(permission) ? permission : [permission];
+  const allowed = required.some((p) => user?.permissions.includes(p) ?? false);
 
-  if (!hasPermission(permission)) {
+  if (!allowed) {
     return (
       <Result
         status="403"

@@ -1,19 +1,24 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Layout, Menu, type MenuProps } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
 import { useUiStore } from '../../stores/ui.store';
 import { COLORS, LAYOUT } from '../../theme/tokens';
-import { NAV_SECTIONS, type NavItem } from './nav.config';
+import {
+  NAV_TREE,
+  NAV_LEAVES,
+  canSee,
+  isParent,
+  type NavLeaf,
+} from './nav.config';
 
 const { Sider } = Layout;
 
-/** Selecciona el item de nav que corresponde a la ruta actual. */
-function matchNavKey(pathname: string, items: NavItem[]): string | undefined {
-  // Coincidencia más específica primero (rutas más largas ganan).
-  const sorted = [...items].sort((a, b) => b.path.length - a.path.length);
-  const match = sorted.find((it) =>
-    it.path === '/' ? pathname === '/' : pathname.startsWith(it.path),
+/** Ruta activa → key de la hoja que mejor coincide (la más específica gana). */
+function matchLeafKey(pathname: string): string | undefined {
+  const sorted = [...NAV_LEAVES].sort((a, b) => b.path.length - a.path.length);
+  const match = sorted.find((leaf) =>
+    leaf.path === '/' ? pathname === '/' : pathname.startsWith(leaf.path),
   );
   return match?.key;
 }
@@ -27,39 +32,44 @@ export function Sidebar() {
 
   const permissions = user?.permissions ?? [];
 
-  // Construye los items del Menu filtrando por permisos, agrupados por sección.
-  const { menuItems, keyToPath, allItems } = useMemo(() => {
+  // Árbol de items del Menu filtrado por permisos.
+  const { menuItems, keyToPath, keyToParent } = useMemo(() => {
     const keyToPath = new Map<string, string>();
-    const allItems: NavItem[] = [];
+    const keyToParent = new Map<string, string>();
     const menuItems: MenuProps['items'] = [];
 
-    for (const section of NAV_SECTIONS) {
-      const visible = section.items.filter(
-        (it) => !it.permission || permissions.includes(it.permission),
-      );
-      if (visible.length === 0) continue;
+    const leafItem = (leaf: NavLeaf) => {
+      keyToPath.set(leaf.key, leaf.path);
+      return { key: leaf.key, icon: leaf.icon, label: leaf.label };
+    };
 
-      for (const it of visible) {
-        keyToPath.set(it.key, it.path);
-        allItems.push(it);
+    for (const node of NAV_TREE) {
+      if (isParent(node)) {
+        const visible = node.children.filter((c) => canSee(permissions, c.permission));
+        if (visible.length === 0) continue;
+        for (const c of visible) keyToParent.set(c.key, node.key);
+        menuItems.push({
+          key: node.key,
+          icon: node.icon,
+          label: node.label,
+          children: visible.map(leafItem),
+        });
+      } else if (canSee(permissions, node.permission)) {
+        menuItems.push(leafItem(node));
       }
-
-      menuItems.push({
-        key: section.key,
-        label: section.title,
-        type: 'group',
-        children: visible.map((it) => ({
-          key: it.key,
-          icon: it.icon,
-          label: it.label,
-        })),
-      });
     }
 
-    return { menuItems, keyToPath, allItems };
+    return { menuItems, keyToPath, keyToParent };
   }, [permissions]);
 
-  const selectedKey = matchNavKey(location.pathname, allItems);
+  const selectedKey = matchLeafKey(location.pathname);
+
+  // Mantiene abierto el submenú del item activo, respetando lo que abra el usuario.
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
+  useEffect(() => {
+    const parent = selectedKey ? keyToParent.get(selectedKey) : undefined;
+    if (parent) setOpenKeys((prev) => (prev.includes(parent) ? prev : [...prev, parent]));
+  }, [selectedKey, keyToParent]);
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
     const path = keyToPath.get(key);
@@ -85,22 +95,33 @@ export function Sidebar() {
         overflow: 'auto',
       }}
     >
-      {/* Marca */}
+      {/* Marca: logo + nombre del sistema */}
       <div
         style={{
           height: LAYOUT.headerHeight,
           display: 'flex',
           alignItems: 'center',
-          padding: collapsed ? '0' : '0 24px',
+          gap: 10,
+          padding: collapsed ? '0' : '0 20px',
           justifyContent: collapsed ? 'center' : 'flex-start',
           color: '#fff',
-          fontWeight: 600,
-          fontSize: 18,
-          letterSpacing: '0.02em',
           whiteSpace: 'nowrap',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        {collapsed ? '🔧' : '🔧 AutoparteAIR'}
+        <span style={{ fontSize: 22, lineHeight: 1 }} role="img" aria-label="logo">
+          🔧
+        </span>
+        {!collapsed && (
+          <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+            <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '0.01em' }}>
+              AutoparteAIR
+            </span>
+            <span style={{ fontSize: 11, color: COLORS.sidebarText }}>
+              Gestión de repuestos
+            </span>
+          </span>
+        )}
       </div>
 
       <Menu
@@ -108,8 +129,10 @@ export function Sidebar() {
         mode="inline"
         items={menuItems}
         selectedKeys={selectedKey ? [selectedKey] : []}
+        openKeys={collapsed ? undefined : openKeys}
+        onOpenChange={setOpenKeys}
         onClick={onClick}
-        style={{ background: COLORS.sidebarBg, borderInlineEnd: 'none' }}
+        style={{ background: COLORS.sidebarBg, borderInlineEnd: 'none', paddingTop: 8 }}
       />
     </Sider>
   );

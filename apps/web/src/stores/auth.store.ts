@@ -9,6 +9,8 @@ interface AuthState {
   setSession: (accessToken: string, user: AuthUser) => void;
   /** Actualiza solo el token (usado por el refresh silencioso). */
   setAccessToken: (accessToken: string) => void;
+  /** Actualiza solo el usuario en memoria (ej. tras editar el perfil). */
+  setUser: (user: AuthUser) => void;
   clear: () => void;
   hasPermission: (permission: PermissionCode) => boolean;
 }
@@ -28,6 +30,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ accessToken, user, isAuthenticated: true }),
 
   setAccessToken: (accessToken) => set({ accessToken }),
+
+  setUser: (user) => set({ user }),
 
   clear: () => set({ accessToken: null, user: null, isAuthenticated: false }),
 

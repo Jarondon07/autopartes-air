@@ -1,5 +1,9 @@
 import { Router, type Response } from 'express';
-import { loginSchema } from '@autopartes-air/shared';
+import {
+  changePasswordSchema,
+  loginSchema,
+  updateProfileSchema,
+} from '@autopartes-air/shared';
 import { isProd } from '../../infra/env';
 import { requireAuth } from '../../middleware/auth';
 import { unauthorized } from '../../middleware/error';
@@ -57,3 +61,32 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
     next(err);
   }
 });
+
+authRouter.patch(
+  '/me',
+  requireAuth,
+  validate(updateProfileSchema),
+  async (req, res, next) => {
+    try {
+      const user = await authService.updateProfile(req.user!.sub, req.body.fullName);
+      res.json({ success: true, data: user });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+authRouter.post(
+  '/change-password',
+  requireAuth,
+  validate(changePasswordSchema),
+  async (req, res, next) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      await authService.changePassword(req.user!.sub, currentPassword, newPassword);
+      res.json({ success: true, data: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);

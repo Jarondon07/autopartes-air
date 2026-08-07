@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import {
   App,
+  AutoComplete,
   Col,
   Form,
   Input,
@@ -10,13 +11,14 @@ import {
   Select,
   Switch,
 } from 'antd';
-import type {
-  CreateProductInput,
-  UpdateProductInput,
-} from '@autopartes-air/shared';
-import { calcPriceUsd, formatUsd } from '@autopartes-air/shared';
+import { useQueryClient } from '@tanstack/react-query';
+import type { CreateProductInput, UpdateProductInput } from '@autopartes-air/shared';
+import { buildProductSku } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
-import { useBrands, useCategories, useVehicles } from '../../hooks/useCatalogs';
+import { createBrand } from '../../api/catalogs.api';
+import { categoryOptions } from '../../lib/categories';
+import { useBrands, useCategories } from '../../hooks/useCatalogs';
+import { useCarBrands, useCarModels } from '../../hooks/useCarBrands';
 import {
   useCreateProduct,
   useProduct,
@@ -25,89 +27,124 @@ import {
 
 interface Props {
   open: boolean;
-  /** null → crear; number → editar ese producto. */
   productId: number | null;
   onClose: () => void;
 }
 
 interface FormValues {
-  code: string;
   name: string;
-  description?: string;
   categoryId?: number;
-  brandId?: number;
-  costUsd: number;
+  brand?: string; // marca del repuesto (texto libre)
+  carBrandId?: number;
+  carModelIds?: number[];
+  yearFrom?: number;
+  yearTo?: number;
+  partNumber: string;
   markupPct: number;
   stock: number;
   minStock: number;
   location?: string;
-  vehicleIds?: number[];
+  shortDescription?: string;
+  description?: string;
   isActive?: boolean;
 }
 
-/** Convierte '' a undefined para campos opcionales de texto. */
 function blankToUndefined(v?: string) {
-  const trimmed = v?.trim();
-  return trimmed ? trimmed : undefined;
+  const t = v?.trim();
+  return t ? t : undefined;
 }
+
+const FICHA_TEMPLATE = '• Material: ';
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR + 1 - 1990 + 1 }, (_, i) => {
+  const y = CURRENT_YEAR + 1 - i;
+  return { value: y, label: String(y) };
+});
 
 export function ProductFormModal({ open, productId, onClose }: Props) {
   const [form] = Form.useForm<FormValues>();
   const { message } = App.useApp();
+  const qc = useQueryClient();
   const isEdit = productId != null;
 
   const categories = useCategories();
   const brands = useBrands();
-  const vehicles = useVehicles();
+  const carBrands = useCarBrands();
   const detail = useProduct(open && isEdit ? productId : null);
 
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
 
-  // Precarga del formulario al abrir en modo edición o reset al crear.
+  const carBrandId = Form.useWatch('carBrandId', form);
+  const carModels = useCarModels(carBrandId ?? null);
+
   useEffect(() => {
     if (!open) return;
     if (isEdit && detail.data) {
+      const brandName = brands.data?.find((b) => b.id === detail.data!.brandId)?.name;
       form.setFieldsValue({
-        code: detail.data.code,
         name: detail.data.name,
-        description: detail.data.description ?? undefined,
         categoryId: detail.data.categoryId ?? undefined,
-        brandId: detail.data.brandId ?? undefined,
-        costUsd: Number(detail.data.costUsd),
+        brand: brandName,
+        carBrandId: detail.data.carBrandId ?? undefined,
+        carModelIds: detail.data.carModelIds,
+        yearFrom: detail.data.yearFrom ?? undefined,
+        yearTo: detail.data.yearTo ?? undefined,
+        partNumber: detail.data.partNumber,
         markupPct: Number(detail.data.markupPct),
         stock: detail.data.stock,
         minStock: detail.data.minStock,
         location: detail.data.location ?? undefined,
-        vehicleIds: detail.data.vehicleIds,
+        shortDescription: detail.data.shortDescription ?? undefined,
+        description: detail.data.description ?? undefined,
         isActive: detail.data.isActive,
       });
     }
     if (!isEdit) {
       form.resetFields();
-      form.setFieldsValue({ markupPct: 30, stock: 0, minStock: 0 });
+      form.setFieldsValue({ markupPct: 30, stock: 0, minStock: 0, description: FICHA_TEMPLATE });
     }
-  }, [open, isEdit, detail.data, form]);
+  }, [open, isEdit, detail.data, brands.data, form]);
 
-  const costUsd = Form.useWatch('costUsd', form) ?? 0;
-  const markupPct = Form.useWatch('markupPct', form) ?? 0;
-  const priceUsd = calcPriceUsd(Number(costUsd), Number(markupPct));
+  // SKU en vivo = [abrev. categoría][abrev. marca carro]-[nº pieza].
+  const categoryId = Form.useWatch('categoryId', form);
+  const partNumber = Form.useWatch('partNumber', form);
+  const catAbbr = categories.data?.find((c) => c.id === categoryId)?.abbreviation;
+  const carAbbr = carBrands.data?.find((b) => b.id === carBrandId)?.abbreviation;
+  const codePreview = partNumber?.trim()
+    ? buildProductSku(catAbbr, carAbbr, partNumber)
+    : '(se genera con categoría, marca del carro y número de pieza)';
 
   const submitting = createProduct.isPending || updateProduct.isPending;
 
+  const resolveBrandId = async (raw?: string): Promise<number | undefined> => {
+    const name = raw?.trim();
+    if (!name) return undefined;
+    const existing = brands.data?.find((b) => b.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing.id;
+    const created = await createBrand({ name });
+    qc.invalidateQueries({ queryKey: ['brands'] });
+    return created.id;
+  };
+
   const handleOk = async () => {
     const values = await form.validateFields();
+    const brandId = await resolveBrandId(values.brand);
     const base = {
-      code: values.code,
-      name: values.name,
-      description: blankToUndefined(values.description),
+      name: values.name.trim(),
+      partNumber: values.partNumber.trim(),
       categoryId: values.categoryId,
-      brandId: values.brandId,
-      costUsd: values.costUsd,
+      brandId,
+      carBrandId: values.carBrandId,
+      carModelIds: values.carModelIds ?? [],
+      yearFrom: values.yearFrom ?? undefined,
+      yearTo: values.yearTo ?? undefined,
       markupPct: values.markupPct,
       minStock: values.minStock,
       location: blankToUndefined(values.location),
-      vehicleIds: values.vehicleIds ?? [],
+      shortDescription: blankToUndefined(values.shortDescription),
+      description: blankToUndefined(values.description),
     };
 
     try {
@@ -135,37 +172,20 @@ export function ProductFormModal({ open, productId, onClose }: Props) {
       okText="Guardar"
       cancelText="Cancelar"
       confirmLoading={submitting}
-      width={720}
+      width={780}
       destroyOnClose
       maskClosable={false}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
-        <Row gutter={16}>
-          <Col span={8}>
-            <Form.Item
-              name="code"
-              label="Código"
-              rules={[{ required: true, message: 'Ingresa el código' }]}
-            >
-              <Input placeholder="FRN-001" />
-            </Form.Item>
-          </Col>
-          <Col span={16}>
-            <Form.Item
-              name="name"
-              label="Nombre"
-              rules={[
-                { required: true, message: 'Ingresa el nombre' },
-                { min: 2, message: 'Mínimo 2 caracteres' },
-              ]}
-            >
-              <Input placeholder="Pastilla de freno delantera" />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Form.Item name="description" label="Descripción">
-          <Input.TextArea rows={2} maxLength={1000} placeholder="Opcional" />
+        <Form.Item
+          name="name"
+          label="Nombre"
+          rules={[
+            { required: true, message: 'Ingresa el nombre' },
+            { min: 2, message: 'Mínimo 2 caracteres' },
+          ]}
+        >
+          <Input placeholder="Evaporador VW Fox / CrossFox (2005-2010) 1.6L" />
         </Form.Item>
 
         <Row gutter={16}>
@@ -177,25 +197,53 @@ export function ProductFormModal({ open, productId, onClose }: Props) {
                 optionFilterProp="label"
                 placeholder="Seleccionar"
                 loading={categories.isLoading}
-                options={(categories.data ?? []).map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                }))}
+                options={categoryOptions(categories.data ?? [])}
               />
             </Form.Item>
           </Col>
           <Col span={12}>
-            <Form.Item name="brandId" label="Marca">
+            <Form.Item
+              name="brand"
+              label="Marca del repuesto"
+              extra="Si no existe, se registra como nueva."
+            >
+              <AutoComplete
+                allowClear
+                placeholder="Denso, Sanden, Valeo…"
+                options={(brands.data ?? []).map((b) => ({ value: b.name }))}
+                filterOption={(input, option) =>
+                  (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item name="carBrandId" label="Marca del carro (para qué carro sirve)">
               <Select
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                placeholder="Seleccionar"
-                loading={brands.isLoading}
-                options={(brands.data ?? []).map((b) => ({
-                  value: b.id,
-                  label: b.name,
-                }))}
+                placeholder="Seleccionar marca"
+                loading={carBrands.isLoading}
+                onChange={() => form.setFieldsValue({ carModelIds: [] })}
+                options={(carBrands.data ?? []).map((b) => ({ value: b.id, label: b.name }))}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item name="carModelIds" label="Modelos (para cuáles sirve)">
+              <Select
+                mode="multiple"
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                placeholder={carBrandId ? 'Seleccionar modelos' : 'Elige primero la marca'}
+                disabled={!carBrandId}
+                loading={carModels.isLoading}
+                options={(carModels.data ?? []).map((m) => ({ value: m.id, label: m.name }))}
               />
             </Form.Item>
           </Col>
@@ -203,54 +251,65 @@ export function ProductFormModal({ open, productId, onClose }: Props) {
 
         <Row gutter={16}>
           <Col span={8}>
-            <Form.Item
-              name="costUsd"
-              label="Costo (USD)"
-              rules={[{ required: true, message: 'Ingresa el costo' }]}
-            >
-              <InputNumber
-                min={0}
-                step={0.01}
-                precision={2}
-                style={{ width: '100%' }}
-                prefix="$"
-              />
+            <Form.Item name="yearFrom" label="Año desde">
+              <Select allowClear showSearch placeholder="—" options={YEAR_OPTIONS} />
             </Form.Item>
           </Col>
+          <Col span={8}>
+            <Form.Item name="yearTo" label="Año hasta">
+              <Select allowClear showSearch placeholder="—" options={YEAR_OPTIONS} />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item
+              name="partNumber"
+              label="Número de pieza"
+              rules={[{ required: true, message: 'Ingresa el número de pieza' }]}
+            >
+              <Input placeholder="905" />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Form.Item
+          label="Código (SKU)"
+          extra="Formato: [abrev. categoría][abrev. marca del carro]-[nº pieza]. Se genera automáticamente."
+        >
+          <Input value={codePreview} disabled />
+        </Form.Item>
+
+         <Form.Item name="shortDescription" label="Descripción corta" extra="Resumen de 1 línea.">
+          <Input maxLength={255} showCount placeholder="Serpentín de aluminio para sistema R134a." />
+        </Form.Item>
+
+        <Form.Item name="description" label="Ficha técnica">
+          <Input.TextArea rows={5} maxLength={5000} />
+        </Form.Item>
+
+        <Row gutter={16}>
           <Col span={8}>
             <Form.Item
               name="markupPct"
-              label="Markup (%)"
-              rules={[{ required: true, message: 'Ingresa el markup' }]}
+              label="Margen de ganancia (%)"
+              rules={[{ required: true, message: 'Ingresa el margen' }]}
             >
-              <InputNumber
-                min={0}
-                max={999.99}
-                step={1}
-                precision={2}
-                style={{ width: '100%' }}
-                suffix="%"
-              />
+              <InputNumber min={0} max={999.99} step={1} precision={2} style={{ width: '100%' }} suffix="%" />
             </Form.Item>
           </Col>
-          <Col span={8}>
-            <Form.Item label="Precio de venta">
-              <Input value={formatUsd(priceUsd)} disabled />
+          <Col span={16}>
+            <Form.Item label="Costo y precio de venta">
+              <Input
+                disabled
+                value="El costo se registra con la compra; el precio se calcula con costo + margen + IVA."
+              />
             </Form.Item>
           </Col>
         </Row>
 
         <Row gutter={16}>
           <Col span={8}>
-            <Form.Item
-              name="stock"
-              label={isEdit ? 'Stock (ajustar en Inventario)' : 'Stock inicial'}
-            >
-              <InputNumber
-                min={0}
-                style={{ width: '100%' }}
-                disabled={isEdit}
-              />
+            <Form.Item name="stock" label={isEdit ? 'Stock (ajustar en Inventario)' : 'Stock inicial'}>
+              <InputNumber min={0} style={{ width: '100%' }} disabled={isEdit} />
             </Form.Item>
           </Col>
           <Col span={8}>
@@ -264,23 +323,6 @@ export function ProductFormModal({ open, productId, onClose }: Props) {
             </Form.Item>
           </Col>
         </Row>
-
-        <Form.Item name="vehicleIds" label="Vehículos compatibles">
-          <Select
-            mode="multiple"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="Seleccionar vehículos"
-            loading={vehicles.isLoading}
-            options={(vehicles.data ?? []).map((v) => ({
-              value: v.id,
-              label: `${v.make} ${v.model}${
-                v.yearFrom ? ` (${v.yearFrom}${v.yearTo ? `-${v.yearTo}` : ''})` : ''
-              }`,
-            }))}
-          />
-        </Form.Item>
 
         {isEdit && (
           <Form.Item name="isActive" label="Activo" valuePropName="checked">
