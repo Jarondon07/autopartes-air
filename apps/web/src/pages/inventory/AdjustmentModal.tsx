@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { App, Alert, Form, Input, InputNumber, Modal, Segmented, Select } from 'antd';
+import { App, Alert, Form, Input, Modal, Segmented, Select } from 'antd';
+import { QuantityInput } from '../../components/NumberInputs';
 import type { Product } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
 import { useProducts } from '../../hooks/useProducts';
@@ -107,11 +108,10 @@ export function AdjustmentModal({ open, onClose }: Props) {
         </Form.Item>
 
         <Form.Item label="Cantidad" required>
-          <InputNumber
+          <QuantityInput
             min={1}
-            style={{ width: '100%' }}
             value={amount}
-            onChange={(v) => setAmount(v)}
+            onChange={(v) => setAmount(v == null ? null : Number(v))}
             placeholder="0"
           />
         </Form.Item>

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -31,8 +32,8 @@ export const products = pgTable(
     priceUsd: numeric('price_usd', { precision: 14, scale: 2 }).generatedAlwaysAs(
       sql`round(cost_usd * (1 + markup_pct / 100), 2)`,
     ),
-    stock: integer('stock').notNull().default(0),
-    minStock: integer('min_stock').notNull().default(0),
+    stock: bigint('stock', { mode: 'number' }).notNull().default(0),
+    minStock: bigint('min_stock', { mode: 'number' }).notNull().default(0),
     location: varchar('location', { length: 100 }),
     yearFrom: integer('year_from'),
     yearTo: integer('year_to'),
@@ -59,6 +60,16 @@ export const productVehicles = pgTable(
   },
   (t) => [primaryKey({ columns: [t.productId, t.vehicleId] })],
 );
+
+/** Imágenes de un producto (galería). `sortOrder` define la posición; 0 = principal. */
+export const productImages = pgTable('product_images', {
+  id: serial('id').primaryKey(),
+  productId: integer('product_id')
+    .notNull()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  url: varchar('url', { length: 300 }).notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
 
 /** Modelos de carro a los que sirve un producto (N:M). */
 export const productCarModels = pgTable(

@@ -1,4 +1,5 @@
 import {
+  bigint,
   index,
   integer,
   numeric,
@@ -46,7 +47,7 @@ export const purchaseDetails = pgTable(
     productId: integer('product_id')
       .notNull()
       .references(() => products.id),
-    quantity: integer('quantity').notNull(),
+    quantity: bigint('quantity', { mode: 'number' }).notNull(),
     unitCostUsd: numeric('unit_cost_usd', { precision: 14, scale: 2 }).notNull(),
     subtotalUsd: numeric('subtotal_usd', { precision: 14, scale: 2 }).notNull(),
   },

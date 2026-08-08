@@ -1,10 +1,11 @@
-import { App, DatePicker, Form, InputNumber, Modal, Select } from 'antd';
+import { App, DatePicker, Form, Modal, Select } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   EXCHANGE_RATE_SOURCES,
   EXCHANGE_RATE_SOURCE_LABELS,
 } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
+import { RateInput } from '../../components/NumberInputs';
 import { useCreateRate } from '../../hooks/useExchangeRates';
 
 interface Props {
@@ -83,13 +84,7 @@ export function RateFormModal({ open, onClose }: Props) {
           label="Tasa (Bs por USD)"
           rules={[{ required: true, message: 'Ingresa la tasa' }]}
         >
-          <InputNumber
-            min={0}
-            step={0.0001}
-            precision={4}
-            style={{ width: '100%' }}
-            suffix="Bs/USD"
-          />
+          <RateInput suffix="Bs/USD" />
         </Form.Item>
       </Form>
     </Modal>

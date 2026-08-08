@@ -7,7 +7,6 @@ import {
   Col,
   Divider,
   Input,
-  InputNumber,
   Row,
   Select,
   Table,
@@ -24,6 +23,7 @@ import {
 } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
 import { listProducts } from '../../api/products.api';
+import { MoneyInput, QuantityInput } from '../../components/NumberInputs';
 import { useProducts } from '../../hooks/useProducts';
 import { useClients } from '../../hooks/useClients';
 import { useCurrentRates } from '../../hooks/useExchangeRates';
@@ -153,11 +153,10 @@ export function CajeroPage() {
       key: 'q',
       width: 80,
       render: (_, it) => (
-        <InputNumber
+        <QuantityInput
           min={1}
           value={it.quantity}
-          onChange={(v) => updateItem(it.product.id, { quantity: v ?? 1 })}
-          style={{ width: '100%' }}
+          onChange={(v) => updateItem(it.product.id, { quantity: Number(v) || 1 })}
         />
       ),
     },
@@ -166,13 +165,9 @@ export function CajeroPage() {
       key: 'price',
       width: 110,
       render: (_, it) => (
-        <InputNumber
-          min={0}
-          step={0.01}
-          precision={2}
+        <MoneyInput
           value={it.unitPriceUsd}
-          onChange={(v) => updateItem(it.product.id, { unitPriceUsd: v ?? 0 })}
-          style={{ width: '100%' }}
+          onChange={(v) => updateItem(it.product.id, { unitPriceUsd: Number(v) || 0 })}
           prefix="$"
         />
       ),

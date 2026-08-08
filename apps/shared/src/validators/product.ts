@@ -23,6 +23,8 @@ const productBaseSchema = z.object({
   /** Años de compatibilidad (rango). */
   yearFrom: z.coerce.number().int().min(1950).max(2100).nullish(),
   yearTo: z.coerce.number().int().min(1950).max(2100).nullish(),
+  /** URLs de imágenes en orden de visualización (la primera es la principal). */
+  images: z.array(z.string().max(300)).max(10, 'Máximo 10 imágenes').optional(),
 });
 
 const yearsValid = (v: { yearFrom?: number | null; yearTo?: number | null }) =>

@@ -71,6 +71,20 @@
       "when": 1786123095974,
       "tag": "0009_bright_ravenous",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786128271775,
+      "tag": "0010_nappy_jubilee",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786132545487,
+      "tag": "0011_purple_elektra",
+      "breakpoints": true
     }
   ]
 }

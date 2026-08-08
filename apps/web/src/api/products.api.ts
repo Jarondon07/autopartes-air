@@ -7,13 +7,19 @@ import type {
 } from '@autopartes-air/shared';
 import { api } from './client';
 
-/** Producto con sus modelos de carro compatibles (respuesta de detalle). */
+/** Producto con sus modelos de carro compatibles e imágenes (respuesta de detalle). */
 export interface ProductDetail extends Product {
   carModelIds: number[];
+  images: string[];
+}
+
+/** Fila de la lista de productos, con miniatura (imagen principal). */
+export interface ProductRow extends Product {
+  primaryImageUrl: string | null;
 }
 
 export interface ProductsPage {
-  data: Product[];
+  data: ProductRow[];
   meta: { page: number; limit: number; total: number };
 }
 
@@ -21,7 +27,7 @@ export interface ProductsPage {
 export async function listProducts(
   filters: Partial<ProductFilters>,
 ): Promise<ProductsPage> {
-  const { data } = await api.get<ApiSuccess<Product[]>>('/products', {
+  const { data } = await api.get<ApiSuccess<ProductRow[]>>('/products', {
     params: filters,
   });
   return {

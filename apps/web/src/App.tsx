@@ -5,11 +5,13 @@ import { NAV_LEAVES, type NavLeaf } from './components/layout/nav.config';
 import { ProtectedRoute } from './components/routing/ProtectedRoute';
 import { RequirePermission } from './components/routing/RequirePermission';
 import { useSessionBootstrap } from './hooks/useAuth';
+import { PERMISSIONS } from '@autopartes-air/shared';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ProductsPage } from './pages/products/ProductsPage';
+import { ProductFormPage } from './pages/products/ProductFormPage';
 import { CategoriesPage } from './pages/categories/CategoriesPage';
 import { ClientsPage } from './pages/clients/ClientsPage';
 import { SuppliersPage } from './pages/suppliers/SuppliersPage';
@@ -61,6 +63,23 @@ export function App() {
           <Route index element={<DashboardPage />} />
           {/* Perfil: accesible por cualquier usuario autenticado (no está en el menú) */}
           <Route path="/perfil" element={<ProfilePage />} />
+          {/* Formulario de producto en pantalla completa (crear/editar) */}
+          <Route
+            path="/productos/nuevo"
+            element={
+              <RequirePermission permission={PERMISSIONS.PRODUCTS_CREATE}>
+                <ProductFormPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/productos/:id/editar"
+            element={
+              <RequirePermission permission={PERMISSIONS.PRODUCTS_UPDATE}>
+                <ProductFormPage />
+              </RequirePermission>
+            }
+          />
           {NAV_LEAVES.filter((leaf) => leaf.path !== '/').map((leaf) => (
             <Route key={leaf.key} path={leaf.path} element={leafElement(leaf)} />
           ))}

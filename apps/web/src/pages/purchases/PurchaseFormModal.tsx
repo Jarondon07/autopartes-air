@@ -5,7 +5,6 @@ import {
   Button,
   Col,
   Input,
-  InputNumber,
   Modal,
   Row,
   Select,
@@ -16,6 +15,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { Product } from '@autopartes-air/shared';
 import { calcPriceUsd, formatUsd, round2 } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
+import { MoneyInput, QuantityInput } from '../../components/NumberInputs';
 import { useProducts } from '../../hooks/useProducts';
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { useCurrentRates } from '../../hooks/useExchangeRates';
@@ -134,11 +134,10 @@ export function PurchaseFormModal({ open, onClose }: Props) {
       key: 'qty',
       width: 90,
       render: (_, it) => (
-        <InputNumber
+        <QuantityInput
           min={1}
           value={it.quantity}
-          onChange={(v) => updateItem(it.product.id, { quantity: v ?? 1 })}
-          style={{ width: '100%' }}
+          onChange={(v) => updateItem(it.product.id, { quantity: Number(v) || 1 })}
         />
       ),
     },
@@ -147,13 +146,9 @@ export function PurchaseFormModal({ open, onClose }: Props) {
       key: 'cost',
       width: 120,
       render: (_, it) => (
-        <InputNumber
-          min={0}
-          step={0.01}
-          precision={2}
+        <MoneyInput
           value={it.unitCostUsd}
-          onChange={(v) => updateItem(it.product.id, { unitCostUsd: v ?? 0 })}
-          style={{ width: '100%' }}
+          onChange={(v) => updateItem(it.product.id, { unitCostUsd: Number(v) || 0 })}
           prefix="$"
         />
       ),

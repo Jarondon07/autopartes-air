@@ -12,7 +12,6 @@ import {
   Card,
   Form,
   Input,
-  InputNumber,
   Modal,
   Space,
   Switch,
@@ -24,6 +23,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { Tax } from '@autopartes-air/shared';
 import { PERMISSIONS } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
+import { PercentInput } from '../../components/NumberInputs';
 import {
   useCreateTax,
   useDeleteTax,
@@ -101,7 +101,7 @@ function TaxFormModal({
           label="Porcentaje (%)"
           rules={[{ required: true, message: 'Ingresa el porcentaje' }]}
         >
-          <InputNumber min={0} max={100} step={0.5} precision={2} style={{ width: '100%' }} suffix="%" />
+          <PercentInput max={100} />
         </Form.Item>
         {isEdit && (
           <Form.Item name="isActive" label="Activo" valuePropName="checked">

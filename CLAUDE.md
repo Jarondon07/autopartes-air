@@ -4,7 +4,7 @@ Guía para trabajar en este repositorio. Léela antes de hacer cambios.
 
 ## Qué es
 
-**AutoparteAIR** — sistema de gestión de compra, venta e inventario de repuestos automotrices para Venezuela. Maneja precios en USD (canónico) y bolívares con tasa de cambio BCV/paralelo. Diseñado *API-first* para soportar múltiples clientes (web y escritorio).
+**AutoparteAIR** — sistema de gestión de compra, venta e inventario de repuestos automotrices para Venezuela. Maneja precios en USD (canónico) y bolívares con tasa de cambio (BCV y otras 3 fuentes). Diseñado *API-first* para soportar múltiples clientes (web y escritorio).
 
 El idioma del proyecto y de la comunicación es **español** (mensajes de UI, commits, comentarios).
 
@@ -77,15 +77,20 @@ El usuario trabaja en **Windows 10** con **PowerShell y Git Bash**. Da los coman
 - **Transacciones:** dentro de `db.transaction`, usar SIEMPRE `tx` (no el `db` global — no ve las filas sin commitear). Patrón: la transacción devuelve el `id` y el `getById` (que usa `db` global) se llama DESPUÉS del commit. Compras/ventas siguen esto.
 
 ### Web (`apps/web/src/`)
+- **Inputs numéricos (regla):** todo campo numérico usa los componentes de `components/NumberInputs.tsx`, nunca un `InputNumber`/`Input` crudo. Máscara es-VE tipo calculadora (dígitos entran por la derecha, miles con `.`, decimales con `,`, solo números): `MoneyInput` (montos, **2 decimales**), `RateInput` (tasas, **4 decimales**), `PercentInput` (porcentajes, 2 decimales, sufijo `%`), `QuantityInput` (**cantidades enteras**, sin decimales). Es solo presentación: la BD guarda montos `NUMERIC(x,2)`, tasas `NUMERIC(x,4)` y cantidades `bigint`.
 - `api/<modulo>.api.ts` — funciones Axios. `hooks/use<Modulo>.ts` — hooks de React Query.
 - El cliente Axios (`api/client.ts`) hace refresh silencioso en 401 y reintenta.
 - Navegación en `components/layout/nav.config.tsx` (árbol con submenús); las **rutas se generan solas** desde `NAV_LEAVES` en `App.tsx`. Cada hoja tiene `path` + `permission`; el menú y las rutas se filtran por permisos.
 - `RequirePermission` acepta un permiso o un array (any-of).
+- **Formularios grandes = pantalla completa, no modal.** El de producto vive en rutas propias (`/productos/nuevo`, `/productos/:id/editar` → `ProductFormPage`, registradas a mano en `App.tsx`), no en una modal. La lista de productos tiene miniatura, drawer de vista previa y activar/desactivar.
 
 ### Datos y dinero
 - Montos en `NUMERIC(14,2)`, tasas en `NUMERIC(14,4)`. Nunca `float`. En TS llegan como **string**; convertir con `Number(...)` solo para mostrar/calcular en UI.
 - `products.priceUsd` es **columna generada** por la BD (`costo × (1 + markup/100)`), no se escribe a mano.
-- **Modelo de precios:** costo en USD; markup por producto; precio Bs = `precio USD × tasa BCV`. Al comprar, el producto toma el **último costo** del lote (recalcula el precio). Las ventas aplican **IVA 16%** (`DEFAULT_IVA_PCT`) y guardan snapshot de tasa + totales USD/Bs.
+- **Modelo de precios:** el costo **NO** se ingresa en el form del producto; llega con la **compra** (el producto toma el **último costo** del lote y recalcula el precio). Precio de venta = `costo + margen + impuestos`. El **margen** por producto tiene default **30%** y solo se fija al **crear** el producto. Precio Bs = `precio USD × tasa BCV`.
+- **Impuestos (IVA):** configurables en `Configuración → Impuestos` (módulo `taxes`). El IVA (16%) ya no es constante fija: `taxes/service.ts → getAppliedRate()` suma las tasas **activas** y se aplica **una vez** sobre el total de la venta. La venta guarda snapshot de tasa de cambio + totales USD/Bs.
+- **SKU del producto:** se genera solo con `buildProductSku(abrevCategoría, abrevMarcaCarro, nºPieza)` (en `shared/utils/sku.ts`) → `[ABREV_CAT][ABREV_CARRO]-[nºpieza]` (ej. `EVAVW-905`). Por eso **categorías** y **marcas de carro** tienen columna `abbreviation`. No se escribe a mano.
+- **Imágenes de producto:** galería (máx. 10) con orden (`sortOrder`); la primera es la principal. Subida con `multer` (`POST /api/v1/uploads`, solo imagen, 3MB → `{url}`), edición con corte libre (`ImageCropModal`). Archivos en `uploads/` (gitignored), servidos en `/uploads`.
 - **Tasas de cambio:** 4 fuentes (`bcv`, `euro`, `intervencion`, `usdt`). El worker las trae de Radar (automáticas = `createdBy null`; manuales = id del usuario). Fallback `BCV_FALLBACK_RATE` si no hay ninguna.
 - Borrado de productos = **baja lógica** (`isActive=false`); categorías tienen `isActive` (activar/desactivar). Ventas se **anulan** (no se borran).
 - Las migraciones (`apps/server/src/db/migrations/`) **se commitean**.
@@ -99,9 +104,12 @@ El usuario trabaja en **Windows 10** con **PowerShell y Git Bash**. Da los coman
 - **Fase 1** ✅ Monorepo, schema, migraciones, seed, auth JWT + RBAC.
 - **Fase 2** ✅ CRUD backend + web completo: Productos, Categorías (con activar/desactivar), Clientes, Proveedores, Tasas (4 fuentes + worker BCV). Shell del layout (sidebar con menú anidado, topbar con perfil, footer). Perfil propio (`/perfil`, editar nombre + cambiar contraseña).
 - **Fase 3** ✅ (web) Inventario (movimientos + ajustes), Compras/Lotes, Ventas + **Cajero/POS** (`/ventas/caja`) + factura + anular.
-- **Fase 4** ⏳ Reportes, dashboard real, usuarios, roles, impresión de recibos. Pendiente también **Deudas** (`/ventas/deudas`, hoy toda venta es de contado).
+- **Configuración** ✅ (web) Usuarios, Roles y permisos (roles **dinámicos** + superusuario **ROOT** oculto), Categorías (con `abbreviation`), Marcas de vehículos + modelos (con logo y corte libre), Impuestos (IVA configurable).
+- **Fase 4** ⏳ Reportes, dashboard real, impresión de recibos. Pendiente también **Deudas** (`/ventas/deudas`, hoy toda venta es de contado).
 
-**Módulos del server:** auth, products, categories, brands, vehicles, clients, suppliers, exchange-rates, inventory, purchases, sales.
+**RBAC — ROOT:** rol nº 1 `ROOT` + usuario inicial `root` = superusuario oculto (list/get/update/delete devuelven 404 para no-root; solo root asigna el rol root; el rol root es ineditable). `admin` sí es visible y puede tener todos los permisos. Los roles son dinámicos (se crean/editan permisos desde la UI).
+
+**Módulos del server:** auth, users, roles, products, categories, brands, car-brands, car-models, vehicles, clients, suppliers, exchange-rates, inventory, purchases, sales, taxes, uploads.
 
 El menú de la web tiene la estructura completa. Rutas no implementadas enlazan a `PlaceholderPage`.
 
@@ -114,5 +122,6 @@ El menú de la web tiene la estructura completa. Rutas no implementadas enlazan 
 - Ant Design 5.24: usar `popupRender` en `Dropdown` (no `dropdownRender`, deprecado).
 - La API de Radar devuelve `{ rates: [...] }` (no un array plano) y `midRate` como **string** — el worker lo parsea así.
 - `.env` y `.env.local` están en `.gitignore` (contienen secretos, incl. `RADAR_API_KEY`). Al clonar, copiar de `.env.example`.
+- Las imágenes subidas viven en `apps/server/uploads/` (gitignored) y se sirven en `/uploads`; Vite hace proxy de `/uploads` → 4300 igual que `/api`. En dev deben correr ambos servicios para ver las miniaturas.
 - Nombre visible del sistema = "AutoparteAIR" (aunque el paquete npm es `autopartes-air`).
 - Los procesos `npm run dev:server` en background pueden dejar el puerto 4300 ocupado; si un arranque no imprime "escuchando", revisar/matar lo que esté en 4300.
