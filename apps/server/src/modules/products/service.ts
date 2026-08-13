@@ -123,33 +123,39 @@ async function setImages(tx: Executor, productId: number, urls: string[]): Promi
 export async function list(f: ProductFilters) {
   const conditions: SQL[] = [];
   if (f.q) {
-    const like = `%${f.q}%`;
-    conditions.push(
-      or(
-        ilike(products.name, like),
-        ilike(products.code, like),
-        ilike(products.partNumber, like),
-        // Marca del carro (ej. "Toyota") por la marca asignada al producto.
-        inArray(
-          products.carBrandId,
-          db.select({ id: carBrands.id }).from(carBrands).where(ilike(carBrands.name, like)),
-        ),
-        // Modelo del carro (ej. "Yaris") vía la tabla puente producto↔modelo.
-        inArray(
-          products.id,
-          db
-            .select({ id: productCarModels.productId })
-            .from(productCarModels)
-            .innerJoin(carModels, eq(carModels.id, productCarModels.carModelId))
-            .where(ilike(carModels.name, like)),
-        ),
-        // Marca del repuesto (ej. "Denso").
-        inArray(
-          products.brandId,
-          db.select({ id: brands.id }).from(brands).where(ilike(brands.name, like)),
-        ),
-      )!,
-    );
+    // Búsqueda multi-palabra: cada palabra debe coincidir en ALGÚN campo (OR),
+    // y todas las palabras deben cumplirse (AND). Así "evaporador toyota" o
+    // "toyota yaris" encuentran combinando nombre + marca del carro + modelo.
+    const tokens = f.q.trim().split(/\s+/).filter(Boolean).slice(0, 6);
+    for (const token of tokens) {
+      const like = `%${token}%`;
+      conditions.push(
+        or(
+          ilike(products.name, like),
+          ilike(products.code, like),
+          ilike(products.partNumber, like),
+          // Marca del carro (ej. "Toyota") por la marca asignada al producto.
+          inArray(
+            products.carBrandId,
+            db.select({ id: carBrands.id }).from(carBrands).where(ilike(carBrands.name, like)),
+          ),
+          // Modelo del carro (ej. "Yaris") vía la tabla puente producto↔modelo.
+          inArray(
+            products.id,
+            db
+              .select({ id: productCarModels.productId })
+              .from(productCarModels)
+              .innerJoin(carModels, eq(carModels.id, productCarModels.carModelId))
+              .where(ilike(carModels.name, like)),
+          ),
+          // Marca del repuesto (ej. "Denso").
+          inArray(
+            products.brandId,
+            db.select({ id: brands.id }).from(brands).where(ilike(brands.name, like)),
+          ),
+        )!,
+      );
+    }
   }
   if (f.categoryId) {
     // Coincide si el producto tiene esa categoría en CUALQUIER posición (no solo la principal).

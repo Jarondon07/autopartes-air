@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import {
+  ArrowLeftOutlined,
   DeleteOutlined,
   PictureOutlined,
   PlusOutlined,
@@ -15,6 +16,7 @@ import {
   Divider,
   Empty,
   Input,
+  Modal,
   Row,
   Select,
   Space,
@@ -35,14 +37,17 @@ import {
 import { getApiErrorMessage } from '../../api/client';
 import { listProducts, type ProductRow } from '../../api/products.api';
 import { MoneyInput, QuantityInput } from '../../components/NumberInputs';
+import { ClientPicker } from './ClientPicker';
+import { ProductPreview } from '../../components/ProductPreview';
+import { SaleInvoice } from '../../components/SaleInvoice';
+import type { SaleDetail } from '../../api/sales.api';
 import { useProducts } from '../../hooks/useProducts';
-import { useClients } from '../../hooks/useClients';
 import { useWarehouses } from '../../hooks/useWarehouses';
 import { useCurrentRates } from '../../hooks/useExchangeRates';
 import { useAppliedTaxRate } from '../../hooks/useTaxes';
 import { useCreateSale } from '../../hooks/useSales';
 
-const { Title, Text } = Typography;
+const { Title, Text, Link } = Typography;
 
 interface CartItem {
   product: Product;
@@ -63,14 +68,14 @@ export function CajeroPage() {
   const [query, setQuery] = useState('');
   const [resultQty, setResultQty] = useState<Record<number, number>>({});
   const [clientId, setClientId] = useState<number | undefined>();
-  const [clientSearch, setClientSearch] = useState('');
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
   const [paymentError, setPaymentError] = useState(false);
   const [applyIva, setApplyIva] = useState(false);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [completedSale, setCompletedSale] = useState<SaleDetail | null>(null);
 
   const results = useProducts({ q: query.trim() || undefined, limit: 12 });
-  const clients = useClients({ q: clientSearch || undefined, limit: 20 });
   const warehouses = useWarehouses();
   const currentRates = useCurrentRates();
   const bcv = Number(currentRates.data?.bcv?.rateBsPerUsd ?? 0);
@@ -93,6 +98,16 @@ export function CajeroPage() {
   const ivaUsd = applyIva ? round2((subtotalUsd * ivaPct) / 100) : 0;
   const totalUsd = round2(subtotalUsd + ivaUsd);
   const totalBs = usdt > 0 ? round2(totalUsd * usdt) : 0; // referencia: total si todo se paga en Bs
+  const totalUsdBcv = usdt > 0 && bcv > 0 ? round2(totalBs / bcv) : totalUsd;
+
+  // Texto del botón Cobrar: con 1 método muestra el monto (USD o USD-BCV); con varios solo "Cobrar".
+  const soloMetodo = paymentMethods.length === 1 ? paymentMethods[0] : undefined;
+  const cobrarLabel =
+    soloMetodo == null
+      ? 'Cobrar'
+      : PAYMENT_METHOD_CURRENCY[soloMetodo] === 'BS'
+        ? `Cobrar ${formatUsd(totalUsdBcv)} (BCV)`
+        : `Cobrar ${formatUsd(totalUsd)}`;
 
   // Desglose de pago: USD primero (editables), Bs al final (auto = resto). El último es el resto.
   const orderedMethods = useMemo(
@@ -105,17 +120,23 @@ export function CajeroPage() {
     [paymentMethods],
   );
   const lastMethod = orderedMethods[orderedMethods.length - 1];
-  const editableMethods = orderedMethods.slice(0, -1);
-  const sumEditableUsd = round2(editableMethods.reduce((s, m) => s + (paymentAmounts[m] ?? 0), 0));
+  const editableMethods = orderedMethods.slice(0, -1); // todos llevan input menos el último (resto)
+  const firstBsIndex = orderedMethods.findIndex((m) => PAYMENT_METHOD_CURRENCY[m] === 'BS');
+
+  /** El monto ingresado se guarda en la moneda del método (USD o Bs). USD cubierto por el método: */
+  const usdCoveredOf = (m: PaymentMethod) => {
+    const raw = paymentAmounts[m] ?? 0;
+    return PAYMENT_METHOD_CURRENCY[m] === 'BS' ? (usdt > 0 ? raw / usdt : 0) : raw;
+  };
+  const sumEditableUsd = round2(editableMethods.reduce((s, m) => s + usdCoveredOf(m), 0));
   const lastAmountUsd = lastMethod != null ? round2(totalUsd - sumEditableUsd) : 0;
   const overAllocated = lastAmountUsd < -0.001;
-  const amountUsdOf = (m: PaymentMethod) =>
-    m === lastMethod ? lastAmountUsd : paymentAmounts[m] ?? 0;
+  const usdOf = (m: PaymentMethod) => (m === lastMethod ? lastAmountUsd : usdCoveredOf(m));
   const buildPayments = () =>
     orderedMethods.map((m) => {
-      const usd = round2(amountUsdOf(m));
-      const bs = PAYMENT_METHOD_CURRENCY[m] === 'BS' ? bsOf(usd) ?? 0 : 0;
-      return { method: m, amountUsd: usd, amountBs: round2(bs) };
+      const usd = round2(usdOf(m));
+      const bs = PAYMENT_METHOD_CURRENCY[m] === 'BS' ? round2(usd * usdt) : 0;
+      return { method: m, amountUsd: usd, amountBs: bs };
     });
 
   const focusSearch = () => setTimeout(() => searchRef.current?.focus(), 0);
@@ -205,6 +226,10 @@ export function CajeroPage() {
       message.warning('El carrito está vacío');
       return;
     }
+    if (clientId == null) {
+      message.warning('Selecciona o crea el cliente');
+      return;
+    }
     if (paymentMethods.length === 0) {
       setPaymentError(true);
       message.warning('Selecciona al menos un método de pago');
@@ -240,6 +265,7 @@ export function CajeroPage() {
         })),
       });
       message.success(`Venta #${sale.id} registrada: ${formatUsd(Number(sale.totalUsd))}`);
+      setCompletedSale(sale);
       clearCart();
     } catch (err) {
       message.error(getApiErrorMessage(err, 'No se pudo registrar la venta'));
@@ -263,13 +289,34 @@ export function CajeroPage() {
     );
   };
 
+  /** Tres líneas de un total (USD, Bs, USD-BCV), todas del mismo tamaño. */
+  const amountLines = (usd: number, strong = false) => {
+    const bs = bsOf(usd);
+    const usdBcv = bs != null && bcv > 0 ? round2(bs / bcv) : null;
+    return (
+      <div style={{ textAlign: 'right', lineHeight: 1.6 }}>
+        <div>
+          <Text strong={strong}>{formatUsd(usd)}</Text>
+        </div>
+        <div>
+          <Text strong={strong}>{bs != null ? formatBs(bs) : '—'}</Text>
+        </div>
+        <div>
+          <Text strong={strong}>{usdBcv != null ? `${formatUsd(usdBcv)} (BCV)` : '—'}</Text>
+        </div>
+      </div>
+    );
+  };
+
   const columns: ColumnsType<CartItem> = [
     {
       title: 'Producto',
       key: 'p',
       render: (_, it) => (
         <span>
-          <Text strong>{it.product.code}</Text> — {it.product.name}
+          <Link onClick={() => setDetailId(it.product.id)} title="Ver ficha del producto">
+            <Text strong>{it.product.code}</Text> — {it.product.name}
+          </Link>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
             stock: {it.product.stock}
@@ -325,6 +372,29 @@ export function CajeroPage() {
       ),
     },
   ];
+
+  // Tras cobrar: muestra la factura completa con botón para volver al cajero.
+  if (completedSale) {
+    return (
+      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+        <Space align="center" style={{ marginBottom: 16 }}>
+          <Button
+            type="primary"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => setCompletedSale(null)}
+          >
+            Volver al cajero
+          </Button>
+          <Title level={3} style={{ margin: 0 }}>
+            <strong>Venta registrada</strong>
+          </Title>
+        </Space>
+        <Card>
+          <SaleInvoice sale={completedSale} />
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -462,29 +532,52 @@ export function CajeroPage() {
               locale={{ emptyText: 'Escanea o busca productos para agregar' }}
             />
           </Card>
+
+          <Card size="small" title="Cliente (requerido)" style={{ marginTop: 16 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Busca por tipo + cédula/RIF; si no existe, créalo. Requerido para cobrar.
+            </Text>
+            <div style={{ marginTop: 8 }}>
+              <ClientPicker value={clientId} onChange={(id) => setClientId(id)} />
+            </div>
+          </Card>
         </Col>
 
         <Col xs={24} lg={9}>
           <Card>
-            <Text type="secondary">Cliente</Text>
-            <Select
-              allowClear
-              showSearch
-              filterOption={false}
-              style={{ width: '100%', marginTop: 4, marginBottom: 12 }}
-              placeholder="Contado (sin cliente)"
-              value={clientId}
-              onSearch={setClientSearch}
-              onChange={setClientId}
-              notFoundContent={clients.isFetching ? 'Buscando…' : 'Sin resultados'}
-              options={(clients.data?.data ?? []).map((c) => ({
-                value: c.id,
-                label: `${c.documentType}-${c.documentNumber} · ${c.name}`,
-              }))}
-            />
+            {applyIva && (
+              <>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <Text type="secondary">Subtotal a pagar en:</Text>
+                  {amountLines(subtotalUsd)}
+                </div>
+
+                <Divider style={{ margin: '12px 0' }} />
+              </>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Checkbox checked={applyIva} onChange={(e) => setApplyIva(e.target.checked)}>
+                Aplicar IVA ({ivaPct}%)
+              </Checkbox>
+              {applyIva && amountLines(ivaUsd)}
+            </div>
+
+            <Divider style={{ margin: '12px 0' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text strong style={{ fontSize: 16 }}>
+                Total
+              </Text>
+              {amountLines(totalUsd, true)}
+            </div>
+
+            <Divider style={{ margin: '12px 0' }} />
 
             <Text type="secondary">
-              Métodos de pago (uno o varios){' '}
+              ¿Cómo se cobra? Métodos de pago (uno o varios){' '}
               {paymentError && <Text type="danger">*</Text>}
             </Text>
             <Select
@@ -506,53 +599,61 @@ export function CajeroPage() {
                 })),
               }))}
             />
-            {paymentError && (
-              <Text type="danger" style={{ fontSize: 12 }}>
-                Selecciona al menos un método de pago
-              </Text>
-            )}
 
             {orderedMethods.length >= 2 && (
               <div style={{ marginTop: 8 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Ingresa el monto (USD) de cada método; el último se calcula solo.
+                  Ingresa el monto de cada método (USD en $, Bs en Bs); el último se calcula solo.
                 </Text>
-                {orderedMethods.map((m) => {
-                  const isLast = m === lastMethod;
-                  const usd = amountUsdOf(m);
+                {orderedMethods.map((m, i) => {
                   const isBs = PAYMENT_METHOD_CURRENCY[m] === 'BS';
-                  const bs = bsOf(usd);
-                  const usdBcv = bs != null && bcv > 0 ? round2(bs / bcv) : null;
+                  const isEditable = m !== lastMethod; // el último es el resto (auto)
+                  const usd = usdOf(m);
+                  const bsAmount = isBs
+                    ? isEditable
+                      ? paymentAmounts[m] ?? 0
+                      : round2(usd * usdt)
+                    : null;
+                  const usdBcv = bsAmount != null && bcv > 0 ? round2(bsAmount / bcv) : null;
+                  const showSep = i === firstBsIndex && firstBsIndex > 0;
                   return (
-                    <div key={m} style={{ marginTop: 6 }}>
-                      <Row justify="space-between" align="middle" gutter={8} wrap={false}>
-                        <Col flex="auto">
-                          <Text>{PAYMENT_METHOD_LABELS[m]}</Text>
-                        </Col>
-                        <Col flex="140px">
-                          {isLast ? (
-                            <div style={{ textAlign: 'right' }}>
-                              <Text strong>{formatUsd(usd)}</Text>
-                            </div>
-                          ) : (
-                            <MoneyInput
-                              value={paymentAmounts[m] ?? 0}
-                              onChange={(v) =>
-                                setPaymentAmounts((a) => ({ ...a, [m]: Number(v) || 0 }))
-                              }
-                              prefix="$"
-                            />
-                          )}
-                        </Col>
-                      </Row>
-                      {isBs && (
-                        <div style={{ textAlign: 'right' }}>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {bs != null ? formatBs(bs) : '—'}
-                            {usdBcv != null ? ` · ${formatUsd(usdBcv)} (BCV)` : ''}
-                          </Text>
-                        </div>
-                      )}
+                    <div key={m}>
+                      {showSep && <Divider style={{ margin: '8px 0' }} />}
+                      <div style={{ marginTop: 6 }}>
+                        <Row justify="space-between" align="middle" gutter={8} wrap={false}>
+                          <Col flex="auto">
+                            <Text>{PAYMENT_METHOD_LABELS[m]}</Text>
+                          </Col>
+                          <Col flex="150px">
+                            {isEditable ? (
+                              <MoneyInput
+                                value={paymentAmounts[m] ?? 0}
+                                onChange={(v) =>
+                                  setPaymentAmounts((a) => ({ ...a, [m]: Number(v) || 0 }))
+                                }
+                                prefix={isBs ? 'Bs' : '$'}
+                              />
+                            ) : (
+                              <div style={{ textAlign: 'right' }}>
+                                <Text strong>
+                                  {isBs
+                                    ? bsAmount != null
+                                      ? formatBs(bsAmount)
+                                      : '—'
+                                    : formatUsd(usd)}
+                                </Text>
+                              </div>
+                            )}
+                          </Col>
+                        </Row>
+                        {isBs && usdBcv != null && (
+                          <div style={{ textAlign: 'right' }}>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {formatUsd(usdBcv)} (BCV)
+                            </Text>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -564,45 +665,21 @@ export function CajeroPage() {
               </div>
             )}
 
-            <Divider />
-
-            <Row justify="space-between">
-              <Text type="secondary">Subtotal</Text>
-              <Text>{formatUsd(subtotalUsd)}</Text>
-            </Row>
-            <Row justify="space-between" align="middle" style={{ marginTop: 6 }}>
-              <Checkbox checked={applyIva} onChange={(e) => setApplyIva(e.target.checked)}>
-                Aplicar IVA ({ivaPct}%)
-              </Checkbox>
-              <Text>{formatUsd(ivaUsd)}</Text>
-            </Row>
-            <Row justify="space-between" align="middle" style={{ marginTop: 10 }}>
-              <Title level={4} style={{ margin: 0 }}>
-                Total
-              </Title>
-              <Title level={4} style={{ margin: 0 }}>
-                {formatUsd(totalUsd)}
-              </Title>
-            </Row>
-            <Row justify="end">
-              <Text type="secondary">{usdt > 0 ? formatBs(totalBs) : 'Sin tasa USDT'}</Text>
-            </Row>
-            {usdt > 0 && bcv > 0 && (
-              <Row justify="end">
-                <Text type="secondary">{formatUsd(round2(totalBs / bcv))} (BCV)</Text>
-              </Row>
-            )}
-
             <Button
               type="primary"
               size="large"
               block
               style={{ marginTop: 16 }}
               loading={createSale.isPending}
-              disabled={cart.length === 0}
+              disabled={
+                cart.length === 0 ||
+                clientId == null ||
+                paymentMethods.length === 0 ||
+                overAllocated
+              }
               onClick={confirmCheckout}
             >
-              Cobrar {formatUsd(totalUsd)}
+              {cobrarLabel}
             </Button>
             <Button
               block
@@ -615,6 +692,17 @@ export function CajeroPage() {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        open={detailId != null}
+        onCancel={() => setDetailId(null)}
+        footer={null}
+        title="Ficha del producto"
+        width={560}
+        destroyOnHidden
+      >
+        <ProductPreview productId={detailId} />
+      </Modal>
     </div>
   );
 }
