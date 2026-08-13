@@ -45,7 +45,7 @@ npm run db:seed        # datos iniciales
 npm run typecheck      # tsc en todos los workspaces
 ```
 
-Usuarios de prueba (seed): `admin`/`admin123`, `vendedor1`/`vendedor123`.
+Usuarios de prueba (seed): `root`/`Clave123*` (superusuario) y `admin`/`Clave123*`. El seed **solo crea usuarios que no existan** (no pisa contraseñas de usuarios ya presentes): para aplicar una contraseña nueva sobre una BD existente, borrar el usuario antes (`DELETE FROM users WHERE username IN ('root','admin')`) y re-sembrar.
 
 El **worker de tasas** solo arranca si `RADAR_API_KEY` está definida en `.env.local`; sin ella, el server funciona igual y las tasas se cargan manualmente.
 

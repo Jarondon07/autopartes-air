@@ -81,26 +81,20 @@ async function seed() {
       .onConflictDoNothing();
   }
 
-  // 4. Usuarios iniciales (admin y un vendedor para probar permisos)
+  // 4. Usuarios iniciales (root y admin). Solo se crean si no existen.
   const roleIdByName = new Map(dbRoles.map((r) => [r.name, r.id]));
   const seedUsers = [
     {
       username: 'root',
-      password: 'root123',
+      password: 'Clave123*',
       fullName: 'Root',
       role: ROLES.ROOT,
     },
     {
       username: 'admin',
-      password: 'admin123',
+      password: 'Clave123*',
       fullName: 'Administrador del Sistema',
       role: ROLES.ADMIN,
-    },
-    {
-      username: 'vendedor1',
-      password: 'vendedor123',
-      fullName: 'Vendedor de Prueba',
-      role: ROLES.VENDEDOR,
     },
   ];
 
