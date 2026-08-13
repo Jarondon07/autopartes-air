@@ -67,9 +67,9 @@ export function PercentInput({ max = 999.99, ...props }: AmountProps) {
   return <AmountInput suffix="%" max={max} {...props} decimals={2} />;
 }
 
-/** Tasa de cambio (4 decimales, es-VE, tipo calculadora). Solo números. */
+/** Tasa de cambio (2 decimales, es-VE, tipo calculadora). Solo números. */
 export function RateInput(props: AmountProps) {
-  return <AmountInput {...props} decimals={4} />;
+  return <AmountInput {...props} decimals={2} />;
 }
 
 /** Cantidad: entera, miles con ".". Solo números. */

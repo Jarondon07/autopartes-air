@@ -2,6 +2,7 @@ import type {
   ApiSuccess,
   CreateSaleInput,
   PaymentMethod,
+  SalePayment,
   SaleStatus,
 } from '@autopartes-air/shared';
 import { api } from './client';
@@ -17,7 +18,7 @@ export interface SaleRow {
   ivaUsd: string;
   totalUsd: string;
   totalBs: string;
-  paymentMethod: PaymentMethod;
+  paymentMethods: PaymentMethod[];
   status: SaleStatus;
   createdAt: string;
 }
@@ -37,6 +38,7 @@ export interface SaleDetail extends SaleRow {
   voidedAt: string | null;
   notes: string | null;
   details: SaleDetailRow[];
+  payments: SalePayment[];
 }
 
 export interface SalesPage {

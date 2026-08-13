@@ -1,8 +1,8 @@
 import { and, desc, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import { round2, type CreateSaleInput, type SaleFilters } from '@autopartes-air/shared';
 import { db } from '../../infra/db';
-import { clients, products, saleDetails, sales } from '../../db/schema';
-import { conflict, notFound } from '../../middleware/error';
+import { clients, products, saleDetails, salePayments, sales } from '../../db/schema';
+import { badRequest, conflict, notFound } from '../../middleware/error';
 import { withForeignKeyGuard } from '../../lib/db-errors';
 import { applyStockChange } from '../inventory/service';
 import { getBcvRate } from '../exchange-rates/service';
@@ -16,7 +16,8 @@ import { getAppliedRate } from '../taxes/service';
  */
 export async function create(input: CreateSaleInput, userId: number) {
   const rate = await getBcvRate();
-  const ivaPct = await getAppliedRate(); // suma de impuestos activos (configurable)
+  // El IVA solo se aplica si la venta lo pide (check del cajero); por defecto NO.
+  const ivaPct = input.applyIva ? await getAppliedRate() : 0;
 
   // Precios vigentes de los productos involucrados.
   const ids = input.details.map((d) => d.productId);
@@ -37,6 +38,12 @@ export async function create(input: CreateSaleInput, userId: number) {
   const totalUsd = round2(subtotalUsd + ivaUsd);
   const totalBs = round2(totalUsd * rate);
 
+  // El desglose de pago (USD cubierto por método) debe cuadrar con el total.
+  const paidUsd = round2(input.payments.reduce((s, p) => s + p.amountUsd, 0));
+  if (Math.abs(paidUsd - totalUsd) > 0.01) {
+    throw badRequest(`El desglose de pago (${paidUsd}) no cuadra con el total (${totalUsd}).`);
+  }
+
   const saleId = await withForeignKeyGuard('Cliente o producto inexistente', () =>
     db.transaction(async (tx) => {
       const [sale] = await tx
@@ -50,11 +57,20 @@ export async function create(input: CreateSaleInput, userId: number) {
           ivaUsd: ivaUsd.toString(),
           totalUsd: totalUsd.toString(),
           totalBs: totalBs.toString(),
-          paymentMethod: input.paymentMethod,
+          paymentMethods: input.payments.map((p) => p.method),
           notes: input.notes ?? null,
         })
         .returning();
       if (!sale) throw new Error('No se pudo crear la venta');
+
+      for (const p of input.payments) {
+        await tx.insert(salePayments).values({
+          saleId: sale.id,
+          method: p.method,
+          amountUsd: p.amountUsd.toString(),
+          amountBs: (p.amountBs ?? 0).toString(),
+        });
+      }
 
       for (const d of details) {
         await tx.insert(saleDetails).values({
@@ -137,7 +153,7 @@ export async function list(f: SaleFilters) {
         ivaUsd: sales.ivaUsd,
         totalUsd: sales.totalUsd,
         totalBs: sales.totalBs,
-        paymentMethod: sales.paymentMethod,
+        paymentMethods: sales.paymentMethods,
         status: sales.status,
         createdAt: sales.createdAt,
       })
@@ -167,7 +183,7 @@ export async function getById(id: number) {
       ivaUsd: sales.ivaUsd,
       totalUsd: sales.totalUsd,
       totalBs: sales.totalBs,
-      paymentMethod: sales.paymentMethod,
+      paymentMethods: sales.paymentMethods,
       status: sales.status,
       voidedAt: sales.voidedAt,
       notes: sales.notes,
@@ -192,5 +208,14 @@ export async function getById(id: number) {
     .innerJoin(products, eq(saleDetails.productId, products.id))
     .where(eq(saleDetails.saleId, id));
 
-  return { ...sale, details };
+  const payments = await db
+    .select({
+      method: salePayments.method,
+      amountUsd: salePayments.amountUsd,
+      amountBs: salePayments.amountBs,
+    })
+    .from(salePayments)
+    .where(eq(salePayments.saleId, id));
+
+  return { ...sale, details, payments };
 }

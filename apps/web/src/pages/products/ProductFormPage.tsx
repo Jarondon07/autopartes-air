@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
+  Alert,
   App,
   AutoComplete,
   Button,
@@ -25,27 +26,33 @@ import { PercentInput, QuantityInput } from '../../components/NumberInputs';
 import { categoryOptions } from '../../lib/categories';
 import { useBrands, useCategories } from '../../hooks/useCatalogs';
 import { useCarBrands, useCarModels } from '../../hooks/useCarBrands';
+import { useWarehouses } from '../../hooks/useWarehouses';
 import {
   useCreateProduct,
   useProduct,
   useUpdateProduct,
 } from '../../hooks/useProducts';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
+
+/** Una fila de modelo compatible: el modelo y su rango de años propio. */
+interface CarModelRow {
+  carModelId?: number;
+  yearFrom?: number | null;
+  yearTo?: number | null;
+}
 
 interface FormValues {
   name: string;
-  categoryId?: number;
+  categoryIds?: number[];
   brand?: string;
   carBrandId?: number;
-  carModelIds?: number[];
-  yearFrom?: number;
-  yearTo?: number;
+  carModels?: CarModelRow[];
   partNumber: string;
   markupPct: number;
   stock: number;
   minStock: number;
-  location?: string;
+  warehouseId?: number;
   shortDescription?: string;
   description?: string;
   isActive?: boolean;
@@ -57,6 +64,17 @@ function blankToUndefined(v?: string) {
 }
 
 const FICHA_TEMPLATE = '• Material: ';
+
+/** Etiqueta legible por campo, para el resumen de validación. */
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Nombre',
+  categoryIds: 'Categorías',
+  brand: 'Marca del repuesto',
+  carBrandId: 'Marca del carro',
+  partNumber: 'Número de pieza',
+  carModels: 'Modelos compatibles',
+  markupPct: 'Margen de ganancia',
+};
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR + 1 - 1990 + 1 }, (_, i) => {
@@ -76,6 +94,7 @@ export function ProductFormPage() {
   const categories = useCategories();
   const brands = useBrands();
   const carBrands = useCarBrands();
+  const warehouses = useWarehouses();
   const detail = useProduct(isEdit ? productId : null);
 
   const createProduct = useCreateProduct();
@@ -83,24 +102,43 @@ export function ProductFormPage() {
 
   const carBrandId = Form.useWatch('carBrandId', form);
   const carModels = useCarModels(carBrandId ?? null);
+  const selectedModels = Form.useWatch('carModels', form);
   const [images, setImages] = useState<string[]>([]);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+
+  /** Opciones de modelo para una fila, deshabilitando los ya elegidos en otras filas. */
+  const modelOptionsFor = (rowName: number) => {
+    const usedIds = new Set(
+      (selectedModels ?? [])
+        .filter((_, i) => i !== rowName)
+        .map((m) => m?.carModelId)
+        .filter((v): v is number => v != null),
+    );
+    return (carModels.data ?? []).map((m) => ({
+      value: m.id,
+      label: m.name,
+      disabled: usedIds.has(m.id),
+    }));
+  };
 
   useEffect(() => {
     if (isEdit && detail.data) {
       const brandName = brands.data?.find((b) => b.id === detail.data!.brandId)?.name;
       form.setFieldsValue({
         name: detail.data.name,
-        categoryId: detail.data.categoryId ?? undefined,
+        categoryIds: detail.data.categoryIds,
         brand: brandName,
         carBrandId: detail.data.carBrandId ?? undefined,
-        carModelIds: detail.data.carModelIds,
-        yearFrom: detail.data.yearFrom ?? undefined,
-        yearTo: detail.data.yearTo ?? undefined,
+        carModels: detail.data.carModels.map((m) => ({
+          carModelId: m.carModelId,
+          yearFrom: m.yearFrom ?? undefined,
+          yearTo: m.yearTo ?? undefined,
+        })),
         partNumber: detail.data.partNumber,
         markupPct: Number(detail.data.markupPct),
         stock: detail.data.stock,
         minStock: detail.data.minStock,
-        location: detail.data.location ?? undefined,
+        warehouseId: detail.data.warehouseId ?? undefined,
         shortDescription: detail.data.shortDescription ?? undefined,
         description: detail.data.description ?? undefined,
         isActive: detail.data.isActive,
@@ -115,9 +153,10 @@ export function ProductFormPage() {
     }
   }, [isEdit, form]);
 
-  const categoryId = Form.useWatch('categoryId', form);
+  const categoryIds = Form.useWatch('categoryIds', form);
   const partNumber = Form.useWatch('partNumber', form);
-  const catAbbr = categories.data?.find((c) => c.id === categoryId)?.abbreviation;
+  const primaryCategoryId = categoryIds?.[0];
+  const catAbbr = categories.data?.find((c) => c.id === primaryCategoryId)?.abbreviation;
   const carAbbr = carBrands.data?.find((b) => b.id === carBrandId)?.abbreviation;
   const codePreview = partNumber?.trim()
     ? buildProductSku(catAbbr, carAbbr, partNumber)
@@ -136,20 +175,37 @@ export function ProductFormPage() {
   };
 
   const onSubmit = async () => {
-    const values = await form.validateFields();
+    let values: FormValues;
+    try {
+      values = await form.validateFields();
+      setMissingFields([]);
+    } catch (e) {
+      const fields = (e as { errorFields?: { name: (string | number)[] }[] }).errorFields ?? [];
+      const labels = Array.from(
+        new Set(fields.map((f) => FIELD_LABELS[String(f.name[0])] ?? String(f.name[0]))),
+      );
+      setMissingFields(labels);
+      if (fields[0]) form.scrollToField(fields[0].name, { behavior: 'smooth', block: 'center' });
+      message.error('Faltan campos por completar.');
+      return;
+    }
     const brandId = await resolveBrandId(values.brand);
     const base = {
       name: values.name.trim(),
       partNumber: values.partNumber.trim(),
-      categoryId: values.categoryId,
+      categoryIds: values.categoryIds ?? [],
       brandId,
       carBrandId: values.carBrandId,
-      carModelIds: values.carModelIds ?? [],
-      yearFrom: values.yearFrom ?? undefined,
-      yearTo: values.yearTo ?? undefined,
+      carModels: (values.carModels ?? [])
+        .filter((m) => m.carModelId != null)
+        .map((m) => ({
+          carModelId: m.carModelId!,
+          yearFrom: m.yearFrom ?? null,
+          yearTo: m.yearTo ?? null,
+        })),
       markupPct: values.markupPct,
       minStock: values.minStock,
-      location: blankToUndefined(values.location),
+      warehouseId: values.warehouseId ?? null,
       shortDescription: blankToUndefined(values.shortDescription),
       description: blankToUndefined(values.description),
       images,
@@ -180,7 +236,17 @@ export function ProductFormPage() {
         </Title>
       </Space>
 
-      <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical" scrollToFirstError>
+        {missingFields.length > 0 && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Faltan campos por completar"
+            description={`Completa: ${missingFields.join(', ')}.`}
+          />
+        )}
+
         <Card title="Información general" style={{ marginBottom: 16 }}>
           <Form.Item
             name="name"
@@ -195,8 +261,14 @@ export function ProductFormPage() {
 
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="categoryId" label="Categoría">
+              <Form.Item
+                name="categoryIds"
+                label="Categorías"
+                extra="La primera define el SKU. Puedes elegir varias."
+                rules={[{ required: true, message: 'Selecciona al menos una categoría' }]}
+              >
                 <Select
+                  mode="multiple"
                   allowClear
                   showSearch
                   optionFilterProp="label"
@@ -211,6 +283,7 @@ export function ProductFormPage() {
                 name="brand"
                 label="Marca del repuesto"
                 extra="Si no existe, se registra como nueva."
+                rules={[{ required: true, message: 'Ingresa la marca del repuesto' }]}
               >
                 <AutoComplete
                   allowClear
@@ -226,46 +299,23 @@ export function ProductFormPage() {
 
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="carBrandId" label="Marca del carro (para qué carro sirve)">
+              <Form.Item
+                name="carBrandId"
+                label="Marca del carro (para qué carro sirve)"
+                rules={[{ required: true, message: 'Selecciona la marca del carro' }]}
+              >
                 <Select
                   allowClear
                   showSearch
                   optionFilterProp="label"
                   placeholder="Seleccionar marca"
                   loading={carBrands.isLoading}
-                  onChange={() => form.setFieldsValue({ carModelIds: [] })}
+                  onChange={() => form.setFieldsValue({ carModels: [] })}
                   options={(carBrands.data ?? []).map((b) => ({ value: b.id, label: b.name }))}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="carModelIds" label="Modelos (para cuáles sirve)">
-                <Select
-                  mode="multiple"
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
-                  placeholder={carBrandId ? 'Seleccionar modelos' : 'Elige primero la marca'}
-                  disabled={!carBrandId}
-                  loading={carModels.isLoading}
-                  options={(carModels.data ?? []).map((m) => ({ value: m.id, label: m.name }))}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col xs={12} md={8}>
-              <Form.Item name="yearFrom" label="Año desde">
-                <Select allowClear showSearch placeholder="—" options={YEAR_OPTIONS} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} md={8}>
-              <Form.Item name="yearTo" label="Año hasta">
-                <Select allowClear showSearch placeholder="—" options={YEAR_OPTIONS} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={8}>
               <Form.Item
                 name="partNumber"
                 label="Número de pieza"
@@ -275,6 +325,97 @@ export function ProductFormPage() {
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item
+            label="Modelos compatibles (cada uno con su rango de años)"
+            style={{ marginBottom: 0 }}
+          >
+            <Form.List
+              name="carModels"
+              rules={[
+                {
+                  validator: async (_, models) => {
+                    if (!models || models.length < 1) {
+                      return Promise.reject(new Error('Agrega al menos un modelo compatible'));
+                    }
+                  },
+                },
+              ]}
+            >
+              {(fields, { add, remove }, { errors }) => (
+                <>
+                  {fields.map((field) => (
+                    <Row gutter={12} key={field.key} align="top" wrap={false}>
+                      <Col flex="auto">
+                        <Form.Item
+                          name={[field.name, 'carModelId']}
+                          rules={[{ required: true, message: 'Elige el modelo' }]}
+                          style={{ marginBottom: 8 }}
+                        >
+                          <Select
+                            showSearch
+                            optionFilterProp="label"
+                            placeholder="Modelo"
+                            loading={carModels.isLoading}
+                            options={modelOptionsFor(field.name)}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col flex="130px">
+                        <Form.Item name={[field.name, 'yearFrom']} style={{ marginBottom: 8 }}>
+                          <Select allowClear showSearch placeholder="Año desde" options={YEAR_OPTIONS} />
+                        </Form.Item>
+                      </Col>
+                      <Col flex="130px">
+                        <Form.Item
+                          name={[field.name, 'yearTo']}
+                          dependencies={[['carModels', field.name, 'yearFrom']]}
+                          style={{ marginBottom: 8 }}
+                          rules={[
+                            ({ getFieldValue }) => ({
+                              validator(_, value) {
+                                const from = getFieldValue(['carModels', field.name, 'yearFrom']);
+                                if (value == null || from == null || value >= from) {
+                                  return Promise.resolve();
+                                }
+                                return Promise.reject(new Error('"Hasta" ≥ "desde"'));
+                              },
+                            }),
+                          ]}
+                        >
+                          <Select allowClear showSearch placeholder="Año hasta" options={YEAR_OPTIONS} />
+                        </Form.Item>
+                      </Col>
+                      <Col flex="32px">
+                        <Button
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => remove(field.name)}
+                          title="Quitar modelo"
+                        />
+                      </Col>
+                    </Row>
+                  ))}
+                  <Button
+                    type="dashed"
+                    icon={<PlusOutlined />}
+                    onClick={() => add({})}
+                    disabled={!carBrandId}
+                    block
+                  >
+                    Agregar modelo
+                  </Button>
+                  {!carBrandId && (
+                    <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                      Elige primero la marca del carro.
+                    </Text>
+                  )}
+                  <Form.ErrorList errors={errors} />
+                </>
+              )}
+            </Form.List>
+          </Form.Item>
 
           <Form.Item
             label="Código (SKU)"
@@ -316,8 +457,17 @@ export function ProductFormPage() {
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item name="location" label="Ubicación">
-                <Input placeholder="Pasillo 3 - B" />
+              <Form.Item name="warehouseId" label="Almacén">
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Seleccionar almacén"
+                  loading={warehouses.isLoading}
+                  options={(warehouses.data ?? [])
+                    .filter((w) => w.isActive)
+                    .map((w) => ({ value: w.id, label: w.name }))}
+                />
               </Form.Item>
             </Col>
           </Row>

@@ -19,6 +19,14 @@ export const taxes = pgTable('taxes', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Almacenes: el lugar donde se guarda el repuesto (catálogo). */
+export const warehouses = pgTable('warehouses', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 80 }).notNull().unique(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Categorías (lista plana). El "código" visible es el propio id. */
 export const categories = pgTable('categories', {
   id: serial('id').primaryKey(),

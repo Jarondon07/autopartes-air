@@ -80,6 +80,13 @@ export interface Tax {
   createdAt: string;
 }
 
+export interface Warehouse {
+  id: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface CarBrand {
   id: number;
   name: string;
@@ -120,12 +127,18 @@ export interface Product {
   priceUsd: string;
   stock: number;
   minStock: number;
-  location: string | null;
-  yearFrom: number | null;
-  yearTo: number | null;
+  warehouseId: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Modelo de carro compatible con un producto, con su rango de años y nombre para mostrar. */
+export interface ProductCarModelLink {
+  carModelId: number;
+  name: string;
+  yearFrom: number | null;
+  yearTo: number | null;
 }
 
 export interface ExchangeRate {
@@ -191,6 +204,12 @@ export interface SaleDetail {
   subtotalUsd: string;
 }
 
+export interface SalePayment {
+  method: PaymentMethod;
+  amountUsd: string;
+  amountBs: string;
+}
+
 export interface Sale {
   id: number;
   clientId: number | null;
@@ -202,7 +221,7 @@ export interface Sale {
   ivaUsd: string;
   totalUsd: string;
   totalBs: string;
-  paymentMethod: PaymentMethod;
+  paymentMethods: PaymentMethod[];
   status: SaleStatus;
   voidedAt: string | null;
   voidedBy: number | null;

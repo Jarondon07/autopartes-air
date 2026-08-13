@@ -76,7 +76,7 @@ export function AdjustmentModal({ open, onClose }: Props) {
       cancelText="Cancelar"
       okButtonProps={{ disabled: !selected || !amount || insufficient }}
       confirmLoading={createAdjustment.isPending}
-      destroyOnClose
+      destroyOnHidden
       maskClosable={false}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>

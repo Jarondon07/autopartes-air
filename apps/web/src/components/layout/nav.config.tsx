@@ -195,6 +195,13 @@ export const NAV_TREE: NavNode[] = [
         icon: <PercentageOutlined />,
         permission: PERMISSIONS.USERS_MANAGE,
       },
+      {
+        key: 'config-almacenes',
+        label: 'Almacén',
+        path: '/configuracion/almacenes',
+        icon: <InboxOutlined />,
+        permission: PERMISSIONS.USERS_MANAGE,
+      },
     ],
   },
 ];

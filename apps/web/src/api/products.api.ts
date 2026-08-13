@@ -2,14 +2,16 @@ import type {
   ApiSuccess,
   CreateProductInput,
   Product,
+  ProductCarModelLink,
   ProductFilters,
   UpdateProductInput,
 } from '@autopartes-air/shared';
 import { api } from './client';
 
-/** Producto con sus modelos de carro compatibles e imágenes (respuesta de detalle). */
+/** Producto con sus categorías, modelos de carro compatibles (con años) e imágenes. */
 export interface ProductDetail extends Product {
-  carModelIds: number[];
+  categoryIds: number[];
+  carModels: ProductCarModelLink[];
   images: string[];
 }
 

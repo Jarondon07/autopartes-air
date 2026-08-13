@@ -15,7 +15,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { Product } from '@autopartes-air/shared';
 import { calcPriceUsd, formatUsd, round2 } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
-import { MoneyInput, QuantityInput } from '../../components/NumberInputs';
+import { MoneyInput, PercentInput, QuantityInput } from '../../components/NumberInputs';
 import { useProducts } from '../../hooks/useProducts';
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { useCurrentRates } from '../../hooks/useExchangeRates';
@@ -27,6 +27,7 @@ interface Item {
   product: Product;
   quantity: number;
   unitCostUsd: number;
+  markupPct: number;
 }
 
 interface Props {
@@ -52,6 +53,7 @@ export function PurchaseFormModal({ open, onClose }: Props) {
   const productsQuery = useProducts({ q: search || undefined, limit: 20 });
   const currentRates = useCurrentRates();
   const bcv = Number(currentRates.data?.bcv?.rateBsPerUsd ?? 0);
+  const usdt = Number(currentRates.data?.usdt?.rateBsPerUsd ?? 0);
 
   const productOptions = (productsQuery.data?.data ?? [])
     .filter((p) => !items.some((it) => it.product.id === p.id))
@@ -80,7 +82,12 @@ export function PurchaseFormModal({ open, onClose }: Props) {
     if (!product) return;
     setItems((prev) => [
       ...prev,
-      { product, quantity: 1, unitCostUsd: Number(product.costUsd) },
+      {
+        product,
+        quantity: 1,
+        unitCostUsd: Number(product.costUsd),
+        markupPct: Number(product.markupPct),
+      },
     ]);
     setSearch('');
   };
@@ -110,6 +117,7 @@ export function PurchaseFormModal({ open, onClose }: Props) {
           productId: it.product.id,
           quantity: it.quantity,
           unitCostUsd: it.unitCostUsd,
+          markupPct: it.markupPct,
         })),
       });
       message.success('Compra registrada: stock y costos actualizados');
@@ -163,29 +171,33 @@ export function PurchaseFormModal({ open, onClose }: Props) {
     {
       title: '% Gan.',
       key: 'markup',
-      width: 80,
-      align: 'right',
-      render: (_, it) => `${Number(it.product.markupPct)}%`,
+      width: 110,
+      render: (_, it) => (
+        <PercentInput
+          value={it.markupPct}
+          onChange={(v) => updateItem(it.product.id, { markupPct: Number(v) || 0 })}
+        />
+      ),
     },
     {
       title: 'P. Venta',
       key: 'sale',
-      width: 160,
+      width: 190,
       align: 'right',
       render: (_, it) => {
-        const usd = calcPriceUsd(it.unitCostUsd, Number(it.product.markupPct));
+        const usd = calcPriceUsd(it.unitCostUsd, it.markupPct); // ceil a dólar entero
+        const bs = usdt > 0 ? round2(usd * usdt) : null;
+        const usdBcv = bs != null && bcv > 0 ? round2(bs / bcv) : null;
         return (
-          <span>
+          <div style={{ textAlign: 'right' }}>
             <Text strong>{formatUsd(usd)}</Text>
-            {bcv > 0 && (
-              <>
-                <br />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {formatBs(round2(usd * bcv))}
-                </Text>
-              </>
-            )}
-          </span>
+            <br />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {bs != null ? formatBs(bs) : '—'}
+              <br />
+              {usdBcv != null ? `${formatUsd(usdBcv)} (BCV)` : '—'}
+            </Text>
+          </div>
         );
       },
     },
@@ -214,7 +226,7 @@ export function PurchaseFormModal({ open, onClose }: Props) {
       cancelText="Cancelar"
       confirmLoading={createPurchase.isPending}
       width={900}
-      destroyOnClose
+      destroyOnHidden
       maskClosable={false}
     >
       <Row gutter={16} style={{ marginTop: 12, marginBottom: 16 }}>

@@ -64,3 +64,16 @@ exchangeRatesRouter.post(
     }
   },
 );
+
+// Actualización manual: consulta Radar en el momento (botón "Actualizar ahora").
+exchangeRatesRouter.post(
+  '/refresh',
+  requirePermission(PERMISSIONS.RATES_CREATE),
+  async (_req, res, next) => {
+    try {
+      ok(res, await service.refresh());
+    } catch (err) {
+      next(err);
+    }
+  },
+);

@@ -49,7 +49,7 @@ export function RateFormModal({ open, onClose }: Props) {
       okText="Registrar"
       cancelText="Cancelar"
       confirmLoading={createRate.isPending}
-      destroyOnClose
+      destroyOnHidden
       maskClosable={false}
       afterOpenChange={(o) => {
         if (o) form.setFieldsValue({ rateDate: dayjs(), source: 'bcv' });

@@ -31,7 +31,11 @@ const envSchema = z.object({
   // Si RADAR_API_KEY está vacío, el worker no se activa (solo tasa manual).
   RADAR_API_URL: z.string().default('https://radar.revolut.team/api/rates'),
   RADAR_API_KEY: z.string().default(''),
-  BCV_FETCH_INTERVAL_MS: z.coerce.number().int().min(60_000).default(3_600_000),
+  /** Hora local (HH:MM) de la consulta diaria automática a Radar. */
+  BCV_FETCH_TIME: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Formato HH:MM')
+    .default('00:30'),
   /** Tasa de emergencia si no hay ninguna registrada en la BD. */
   BCV_FALLBACK_RATE: z.coerce.number().positive().default(36),
 });

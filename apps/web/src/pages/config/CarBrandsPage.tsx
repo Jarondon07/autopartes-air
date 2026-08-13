@@ -8,7 +8,7 @@ import {
   PlusOutlined,
   StopOutlined,
 } from '@ant-design/icons';
-import { App, Avatar, Button, Card, Space, Table, Tag, Typography } from 'antd';
+import { App, Button, Card, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { CarBrand } from '@autopartes-air/shared';
 import { PERMISSIONS } from '@autopartes-air/shared';
@@ -87,15 +87,32 @@ export function CarBrandsPage() {
     {
       title: 'Logo',
       dataIndex: 'logoUrl',
-      width: 80,
+      width: 96,
       render: (url: string | null) => (
-        <Avatar
-          shape="square"
-          size={44}
-          src={url ?? undefined}
-          icon={<CarOutlined />}
-          style={{ background: url ? '#fff' : '#f0f0f0', color: '#8c8c8c' }}
-        />
+        <div
+          style={{
+            width: 72,
+            height: 44,
+            borderRadius: 6,
+            border: '1px solid #f0f0f0',
+            background: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 4,
+            color: '#bfbfbf',
+          }}
+        >
+          {url ? (
+            <img
+              src={url}
+              alt="Logo"
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+            />
+          ) : (
+            <CarOutlined style={{ fontSize: 20 }} />
+          )}
+        </div>
       ),
     },
     {

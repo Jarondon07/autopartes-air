@@ -70,7 +70,7 @@ function extractRate(rates: RadarRate[], radarSource: string, base: string): num
   const mid =
     typeof entry.midRate === 'string' ? Number.parseFloat(entry.midRate) : entry.midRate;
   return typeof mid === 'number' && Number.isFinite(mid)
-    ? Math.round(mid * 10_000) / 10_000
+    ? Math.round(mid * 100) / 100 // tasas a 2 decimales
     : null;
 }
 
@@ -94,25 +94,52 @@ async function upsertRate(source: ExchangeRateSource, rate: number): Promise<boo
   return true;
 }
 
-/** Un ciclo del job: consulta Radar y actualiza las 4 tasas del día. */
+/**
+ * Consulta Radar y actualiza las 4 tasas del día. Devuelve qué fuentes cambiaron.
+ * Propaga errores (lo usa el endpoint manual "Actualizar ahora").
+ */
+export async function runRatesFetch(): Promise<{ updated: string[] }> {
+  const rates = await fetchRadarRates();
+  const updated: string[] = [];
+
+  for (const { source, radarSource, base } of RADAR_MAP) {
+    const rate = extractRate(rates, radarSource, base);
+    if (rate == null) {
+      console.warn(`[tasas] Radar no devolvió ${source} (${base}/VES).`);
+      continue;
+    }
+    if (await upsertRate(source, rate)) updated.push(`${source}=${rate}`);
+  }
+
+  if (updated.length) console.log(`[tasas] Actualizadas: ${updated.join(', ')}.`);
+  return { updated };
+}
+
+/** Un ciclo del job programado: como runRatesFetch pero sin propagar errores. */
 export async function fetchRatesJob(): Promise<void> {
   try {
-    const rates = await fetchRadarRates();
-    const updated: string[] = [];
-
-    for (const { source, radarSource, base } of RADAR_MAP) {
-      const rate = extractRate(rates, radarSource, base);
-      if (rate == null) {
-        console.warn(`[tasas] Radar no devolvió ${source} (${base}/VES).`);
-        continue;
-      }
-      if (await upsertRate(source, rate)) updated.push(`${source}=${rate}`);
-    }
-
-    if (updated.length) console.log(`[tasas] Actualizadas: ${updated.join(', ')}.`);
+    await runRatesFetch();
   } catch (err) {
     console.error('[tasas] Error al consultar Radar:', err instanceof Error ? err.message : err);
   }
+}
+
+/** Milisegundos hasta la próxima ocurrencia local de HH:MM. */
+function msUntil(timeHHMM: string): number {
+  const [h, m] = timeHHMM.split(':').map(Number);
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(h ?? 0, m ?? 0, 0, 0);
+  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+/** Programa la consulta para la próxima HH:MM y se reprograma cada día. */
+function scheduleDaily(timeHHMM: string): void {
+  setTimeout(() => {
+    void fetchRatesJob();
+    scheduleDaily(timeHHMM); // reprograma para el día siguiente (recalcula, tolera DST)
+  }, msUntil(timeHHMM));
 }
 
 /** Arranca el worker si hay RADAR_API_KEY; si no, queda solo la carga manual. */
@@ -121,8 +148,7 @@ export function startRatesWorker(): void {
     console.log('ℹ️  Worker de tasas deshabilitado (define RADAR_API_KEY para activarlo).');
     return;
   }
-  const minutes = Math.round(env.BCV_FETCH_INTERVAL_MS / 60_000);
-  console.log(`🔄 Worker de tasas activo: consulta cada ${minutes} min.`);
-  void fetchRatesJob();
-  setInterval(() => void fetchRatesJob(), env.BCV_FETCH_INTERVAL_MS);
+  console.log(`🔄 Worker de tasas activo: consulta diaria a las ${env.BCV_FETCH_TIME}.`);
+  void fetchRatesJob(); // una consulta al arrancar para tener datos frescos
+  scheduleDaily(env.BCV_FETCH_TIME);
 }

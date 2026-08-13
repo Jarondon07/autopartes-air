@@ -62,9 +62,14 @@ export async function create(input: CreatePurchaseInput, userId: number) {
           });
 
           // Último costo: el producto toma el costo de este lote (recalcula precio).
+          // Si la compra trae un margen, también lo actualiza en el producto.
           await tx
             .update(products)
-            .set({ costUsd: d.unitCostUsd.toString(), updatedAt: new Date() })
+            .set({
+              costUsd: d.unitCostUsd.toString(),
+              ...(d.markupPct !== undefined && { markupPct: d.markupPct.toString() }),
+              updatedAt: new Date(),
+            })
             .where(eq(products.id, d.productId));
         }
 

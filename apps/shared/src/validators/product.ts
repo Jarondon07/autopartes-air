@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { moneySchema, paginationSchema } from './common';
 
+/** Un modelo de carro compatible con su rango de años propio. */
+export const productCarModelSchema = z
+  .object({
+    carModelId: z.number().int().positive(),
+    yearFrom: z.coerce.number().int().min(1950).max(2100).nullish(),
+    yearTo: z.coerce.number().int().min(1950).max(2100).nullish(),
+  })
+  .refine((v) => v.yearFrom == null || v.yearTo == null || v.yearTo >= v.yearFrom, {
+    message: 'El año "hasta" debe ser mayor o igual al "desde"',
+    path: ['yearTo'],
+  });
+
 const productBaseSchema = z.object({
   // El código se genera en el servidor a partir de marca + número de pieza.
   code: z.string().max(50).optional(),
@@ -8,39 +20,38 @@ const productBaseSchema = z.object({
   name: z.string().min(2).max(200),
   shortDescription: z.string().max(255).nullish(),
   description: z.string().max(5000).nullish(),
-  categoryId: z.number().int().positive().nullish(),
+  /** Categorías del producto (la primera es la principal y define el SKU). */
+  categoryIds: z.array(z.number().int().positive()).optional(),
   brandId: z.number().int().positive().nullish(),
   /** Marca del carro para el que sirve (una sola). */
   carBrandId: z.number().int().positive().nullish(),
-  /** Modelos del carro a los que sirve. */
-  carModelIds: z.array(z.number().int().positive()).optional(),
+  /** Modelos del carro a los que sirve, cada uno con su rango de años. */
+  carModels: z.array(productCarModelSchema).optional(),
   // El costo se define al registrar la compra (último costo); opcional al crear.
   costUsd: moneySchema.optional(),
   markupPct: z.coerce.number().min(0).max(999.99),
   stock: z.number().int().min(0).default(0),
   minStock: z.number().int().min(0).default(0),
-  location: z.string().max(100).nullish(),
-  /** Años de compatibilidad (rango). */
-  yearFrom: z.coerce.number().int().min(1950).max(2100).nullish(),
-  yearTo: z.coerce.number().int().min(1950).max(2100).nullish(),
+  warehouseId: z.number().int().positive().nullish(),
   /** URLs de imágenes en orden de visualización (la primera es la principal). */
   images: z.array(z.string().max(300)).max(10, 'Máximo 10 imágenes').optional(),
 });
 
-const yearsValid = (v: { yearFrom?: number | null; yearTo?: number | null }) =>
-  v.yearFrom == null || v.yearTo == null || v.yearTo >= v.yearFrom;
-const yearsError = {
-  message: 'El año "hasta" debe ser mayor o igual al "desde"',
-  path: ['yearTo'] as (string | number)[],
-};
-
-export const createProductSchema = productBaseSchema.refine(yearsValid, yearsError);
+/** Al crear, estos campos son obligatorios (además de nombre y número de pieza). */
+export const createProductSchema = productBaseSchema.superRefine((v, ctx) => {
+  const require = (ok: boolean, path: string, message: string) => {
+    if (!ok) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+  };
+  require((v.categoryIds?.length ?? 0) > 0, 'categoryIds', 'Selecciona al menos una categoría');
+  require(v.brandId != null, 'brandId', 'Selecciona la marca del repuesto');
+  require(v.carBrandId != null, 'carBrandId', 'Selecciona la marca del carro');
+  require((v.carModels?.length ?? 0) > 0, 'carModels', 'Agrega al menos un modelo compatible');
+});
 
 export const updateProductSchema = productBaseSchema
   .omit({ stock: true })
   .partial()
-  .extend({ isActive: z.boolean().optional() })
-  .refine(yearsValid, yearsError);
+  .extend({ isActive: z.boolean().optional() });
 
 export const productFiltersSchema = paginationSchema.extend({
   q: z.string().max(100).optional(),
@@ -50,6 +61,7 @@ export const productFiltersSchema = paginationSchema.extend({
   isActive: z.coerce.boolean().optional(),
 });
 
+export type ProductCarModelInput = z.infer<typeof productCarModelSchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type ProductFilters = z.infer<typeof productFiltersSchema>;

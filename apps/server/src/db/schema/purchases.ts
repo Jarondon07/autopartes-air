@@ -25,7 +25,7 @@ export const purchases = pgTable(
     invoiceNumber: varchar('invoice_number', { length: 50 }),
     purchaseDate: timestamp('purchase_date', { withTimezone: true }).notNull().defaultNow(),
     // Snapshot de la tasa al momento de la compra
-    exchangeRate: numeric('exchange_rate', { precision: 14, scale: 4 }).notNull(),
+    exchangeRate: numeric('exchange_rate', { precision: 14, scale: 2 }).notNull(),
     totalUsd: numeric('total_usd', { precision: 14, scale: 2 }).notNull(),
     totalBs: numeric('total_bs', { precision: 14, scale: 2 }).notNull(),
     notes: varchar('notes', { length: 500 }),

@@ -85,6 +85,69 @@
       "when": 1786132545487,
       "tag": "0011_purple_elektra",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786160391839,
+      "tag": "0012_clever_champions",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786317661953,
+      "tag": "0013_mushy_sphinx",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786317679476,
+      "tag": "0014_shallow_the_hunter",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1786473937286,
+      "tag": "0015_breezy_the_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786584881501,
+      "tag": "0016_odd_kulan_gath",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786585723209,
+      "tag": "0017_ambitious_fixer",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786588074484,
+      "tag": "0018_brainy_random",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786588152416,
+      "tag": "0019_neat_captain_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786624451909,
+      "tag": "0020_fresh_betty_ross",
+      "breakpoints": true
     }
   ]
 }

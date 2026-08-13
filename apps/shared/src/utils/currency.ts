@@ -8,9 +8,12 @@ export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-/** Precio de venta a partir de costo y % de markup. */
+/**
+ * Precio de venta a partir de costo y % de markup.
+ * Se redondea SIEMPRE hacia arriba a dólar entero (ej. 12,35 → 13,00).
+ */
 export function calcPriceUsd(costUsd: number, markupPct: number): number {
-  return round2(costUsd * (1 + markupPct / 100));
+  return Math.ceil(costUsd * (1 + markupPct / 100));
 }
 
 export function usdToBs(amountUsd: number, rateBsPerUsd: number): number {

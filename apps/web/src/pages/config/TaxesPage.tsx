@@ -85,7 +85,7 @@ function TaxFormModal({
       okText="Guardar"
       cancelText="Cancelar"
       confirmLoading={createTax.isPending || updateTax.isPending}
-      destroyOnClose
+      destroyOnHidden
       maskClosable={false}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>

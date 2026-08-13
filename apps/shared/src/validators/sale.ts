@@ -9,10 +9,21 @@ export const saleDetailInputSchema = z.object({
   unitPriceUsd: moneySchema.optional(),
 });
 
+/** Un pago del desglose: método + valor cubierto en USD + Bs cobrado. */
+export const salePaymentInputSchema = z.object({
+  method: z.enum(PAYMENT_METHODS),
+  amountUsd: moneySchema,
+  amountBs: moneySchema.default(0),
+});
+
 export const createSaleSchema = z.object({
   clientId: z.number().int().positive().nullish(),
-  paymentMethod: z.enum(PAYMENT_METHODS),
+  payments: z
+    .array(salePaymentInputSchema)
+    .min(1, 'Selecciona al menos un método de pago'),
   notes: z.string().max(500).nullish(),
+  /** Si aplica el IVA al total. Por defecto NO se aplica. */
+  applyIva: z.boolean().optional(),
   details: z.array(saleDetailInputSchema).min(1, 'La venta necesita al menos un producto'),
 });
 
@@ -24,5 +35,6 @@ export const saleFiltersSchema = paginationSchema.extend({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+export type SalePaymentInput = z.infer<typeof salePaymentInputSchema>;
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 export type SaleFilters = z.infer<typeof saleFiltersSchema>;

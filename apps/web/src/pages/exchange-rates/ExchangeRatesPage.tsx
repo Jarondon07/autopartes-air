@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { DollarOutlined, PlusOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Row, Statistic, Table, Tag, Typography } from 'antd';
+import { DollarOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { App, Button, Card, Col, Row, Space, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import type { ExchangeRate } from '@autopartes-air/shared';
@@ -9,7 +9,8 @@ import {
   EXCHANGE_RATE_SOURCE_LABELS,
   PERMISSIONS,
 } from '@autopartes-air/shared';
-import { useCurrentRates, useRates } from '../../hooks/useExchangeRates';
+import { getApiErrorMessage } from '../../api/client';
+import { useCurrentRates, useRates, useRefreshRates } from '../../hooks/useExchangeRates';
 import { useAuthStore } from '../../stores/auth.store';
 import { RateFormModal } from './RateFormModal';
 
@@ -26,11 +27,12 @@ const SOURCE_COLOR: Record<string, string> = {
 function formatRate(v: string | number): string {
   return Number(v).toLocaleString('es-VE', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
+    maximumFractionDigits: 2,
   });
 }
 
 export function ExchangeRatesPage() {
+  const { message, modal } = App.useApp();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canCreate = hasPermission(PERMISSIONS.RATES_CREATE);
 
@@ -40,6 +42,28 @@ export function ExchangeRatesPage() {
 
   const current = useCurrentRates();
   const rates = useRates({ page, limit });
+  const refreshRates = useRefreshRates();
+
+  const confirmRefresh = () => {
+    modal.confirm({
+      title: '¿Actualizar las tasas ahora?',
+      content: 'Se consultará Radar en el momento y se guardarán las tasas del día.',
+      okText: 'Sí, actualizar',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          const { updated } = await refreshRates.mutateAsync();
+          message.success(
+            updated.length
+              ? `Tasas actualizadas: ${updated.length} fuente(s).`
+              : 'Tasas ya estaban al día (sin cambios).',
+          );
+        } catch (err) {
+          message.error(getApiErrorMessage(err, 'No se pudo actualizar las tasas'));
+        }
+      },
+    });
+  };
 
   const columns: ColumnsType<ExchangeRate> = [
     {
@@ -92,14 +116,23 @@ export function ExchangeRatesPage() {
             <strong>Tasas de cambio</strong>
           </Title>
           <Text type="secondary">
-            Se actualizan automáticamente cada hora; también puedes registrarlas
-            manualmente.
+            Se actualizan automáticamente cada día a las 00:30; también puedes
+            actualizarlas ahora o registrarlas manualmente.
           </Text>
         </div>
         {canCreate && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-            Registrar tasa
-          </Button>
+          <Space>
+            <Button
+              icon={<ReloadOutlined />}
+              loading={refreshRates.isPending}
+              onClick={confirmRefresh}
+            >
+              Actualizar ahora
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+              Registrar tasa
+            </Button>
+          </Space>
         )}
       </div>
 

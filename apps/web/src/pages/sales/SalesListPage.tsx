@@ -89,9 +89,10 @@ export function SalesListPage() {
     },
     {
       title: 'Pago',
-      dataIndex: 'paymentMethod',
-      width: 130,
-      render: (m: SaleRow['paymentMethod']) => PAYMENT_METHOD_LABELS[m],
+      dataIndex: 'paymentMethods',
+      width: 160,
+      render: (ms: SaleRow['paymentMethods']) =>
+        (ms ?? []).map((m) => PAYMENT_METHOD_LABELS[m]).join(', ') || '—',
     },
     {
       title: 'Total USD',
@@ -217,7 +218,16 @@ export function SalesListPage() {
                 {dayjs(detail.data.saleDate).format('DD/MM/YYYY HH:mm')}
               </Descriptions.Item>
               <Descriptions.Item label="Pago">
-                {PAYMENT_METHOD_LABELS[detail.data.paymentMethod]}
+                {(detail.data.payments?.length ?? 0) > 0
+                  ? detail.data.payments.map((p) => {
+                      const bs = Number(p.amountBs);
+                      return `${PAYMENT_METHOD_LABELS[p.method]}: ${formatUsd(Number(p.amountUsd))}${
+                        bs > 0 ? ` (${formatBs(bs)})` : ''
+                      }`;
+                    }).join(' · ')
+                  : (detail.data.paymentMethods ?? [])
+                      .map((m) => PAYMENT_METHOD_LABELS[m])
+                      .join(', ') || '—'}
               </Descriptions.Item>
               <Descriptions.Item label="Tasa (snapshot)">
                 {formatBs(detail.data.exchangeRate)} / USD

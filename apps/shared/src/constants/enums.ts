@@ -5,7 +5,7 @@ export const PAYMENT_METHODS = [
   'pago_movil',
   'punto_venta',
   'zelle',
-  'mixto',
+  'binance_usdt',
 ] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
@@ -16,8 +16,25 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   pago_movil: 'Pago Móvil',
   punto_venta: 'Punto de Venta',
   zelle: 'Zelle',
-  mixto: 'Mixto',
+  binance_usdt: 'Binance USDT',
 };
+
+/** Moneda de cada método de pago: define el precio a cobrar (USD vs Bs vía USDT/BCV). */
+export const PAYMENT_METHOD_CURRENCY: Record<PaymentMethod, 'USD' | 'BS'> = {
+  efectivo_usd: 'USD',
+  zelle: 'USD',
+  binance_usdt: 'USD',
+  efectivo_bs: 'BS',
+  transferencia: 'BS',
+  pago_movil: 'BS',
+  punto_venta: 'BS',
+};
+
+/** Métodos agrupados por moneda, en orden de presentación (para el select agrupado). */
+export const PAYMENT_METHODS_BY_CURRENCY: { currency: 'USD' | 'BS'; methods: PaymentMethod[] }[] = [
+  { currency: 'USD', methods: ['efectivo_usd', 'zelle', 'binance_usdt'] },
+  { currency: 'BS', methods: ['efectivo_bs', 'transferencia', 'pago_movil', 'punto_venta'] },
+];
 
 export const DOCUMENT_TYPES = ['V', 'J', 'E', 'P', 'G'] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];

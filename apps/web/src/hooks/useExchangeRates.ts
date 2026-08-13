@@ -38,3 +38,12 @@ export function useCreateRate() {
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });
 }
+
+/** Actualización manual: consulta Radar en el momento. */
+export function useRefreshRates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => ratesApi.refreshRates(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+}

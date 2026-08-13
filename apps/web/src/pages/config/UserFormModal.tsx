@@ -78,7 +78,7 @@ export function UserFormModal({ open, user, onClose }: Props) {
       okText="Guardar"
       cancelText="Cancelar"
       confirmLoading={submitting}
-      destroyOnClose
+      destroyOnHidden
       maskClosable={false}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>

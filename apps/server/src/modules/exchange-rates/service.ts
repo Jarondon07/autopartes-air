@@ -7,7 +7,9 @@ import {
 import { db } from '../../infra/db';
 import { exchangeRates } from '../../db/schema';
 import { env } from '../../infra/env';
+import { badRequest } from '../../middleware/error';
 import { withUniqueGuard } from '../../lib/db-errors';
+import { runRatesFetch } from './bcv-worker';
 
 const DUP = 'Ya existe una tasa registrada para esa fecha y fuente';
 
@@ -82,4 +84,13 @@ export function create(input: CreateExchangeRateInput, userId: number) {
       .returning();
     return row;
   });
+}
+
+/** Consulta Radar en el momento (botón "Actualizar ahora") y devuelve las tasas vigentes. */
+export async function refresh() {
+  if (!env.RADAR_API_KEY) {
+    throw badRequest('El worker de tasas no está configurado (falta RADAR_API_KEY).');
+  }
+  const { updated } = await runRatesFetch();
+  return { updated, current: await current() };
 }

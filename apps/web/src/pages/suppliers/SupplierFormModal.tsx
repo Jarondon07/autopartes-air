@@ -79,7 +79,7 @@ export function SupplierFormModal({ open, supplier, onClose }: Props) {
       cancelText="Cancelar"
       confirmLoading={submitting}
       width={600}
-      destroyOnClose
+      destroyOnHidden
       maskClosable={false}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>

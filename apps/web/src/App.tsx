@@ -24,6 +24,7 @@ import { UsersPage } from './pages/config/UsersPage';
 import { RolesPage } from './pages/config/RolesPage';
 import { CarBrandsPage } from './pages/config/CarBrandsPage';
 import { TaxesPage } from './pages/config/TaxesPage';
+import { WarehousesPage } from './pages/config/WarehousesPage';
 
 /** Páginas ya implementadas, por ruta. El resto usa PlaceholderPage. */
 const IMPLEMENTED: Record<string, ReactNode> = {
@@ -40,6 +41,7 @@ const IMPLEMENTED: Record<string, ReactNode> = {
   '/configuracion/marcas-vehiculos': <CarBrandsPage />,
   '/configuracion/tasas': <ExchangeRatesPage />,
   '/configuracion/impuestos': <TaxesPage />,
+  '/configuracion/almacenes': <WarehousesPage />,
 };
 
 /** Envuelve el elemento con control de permiso si la hoja lo requiere. */

@@ -41,3 +41,14 @@ export async function createRate(
   const { data } = await api.post<ApiSuccess<ExchangeRate>>('/exchange-rates', input);
   return data.data;
 }
+
+export interface RefreshResult {
+  updated: string[];
+  current: CurrentRates;
+}
+
+/** POST /exchange-rates/refresh — consulta Radar en el momento. */
+export async function refreshRates(): Promise<RefreshResult> {
+  const { data } = await api.post<ApiSuccess<RefreshResult>>('/exchange-rates/refresh');
+  return data.data;
+}

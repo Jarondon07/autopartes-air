@@ -77,7 +77,7 @@ export function ImageCropModal({ open, src, loading, onCancel, onConfirm }: Prop
       confirmLoading={loading}
       okButtonProps={{ disabled: !completed?.width }}
       width={640}
-      destroyOnClose
+      destroyOnHidden
     >
       <Text type="secondary">
         Arrastra para seleccionar el área; puedes ajustar el recorte libremente.

@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   index,
@@ -5,10 +6,11 @@ import {
   numeric,
   pgTable,
   serial,
+  text,
   timestamp,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { paymentMethodEnum, saleStatusEnum } from './enums';
+import { saleStatusEnum } from './enums';
 import { clients } from './parties';
 import { products } from './products';
 import { users } from './rbac';
@@ -23,13 +25,16 @@ export const sales = pgTable(
       .references(() => users.id),
     saleDate: timestamp('sale_date', { withTimezone: true }).notNull().defaultNow(),
     // Snapshots al momento de la venta: tasa, IVA y totales en ambas monedas
-    exchangeRate: numeric('exchange_rate', { precision: 14, scale: 4 }).notNull(),
+    exchangeRate: numeric('exchange_rate', { precision: 14, scale: 2 }).notNull(),
     subtotalUsd: numeric('subtotal_usd', { precision: 14, scale: 2 }).notNull(),
     ivaPct: numeric('iva_pct', { precision: 5, scale: 2 }).notNull().default('16'),
     ivaUsd: numeric('iva_usd', { precision: 14, scale: 2 }).notNull(),
     totalUsd: numeric('total_usd', { precision: 14, scale: 2 }).notNull(),
     totalBs: numeric('total_bs', { precision: 14, scale: 2 }).notNull(),
-    paymentMethod: paymentMethodEnum('payment_method').notNull(),
+    paymentMethods: text('payment_methods')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     status: saleStatusEnum('status').notNull().default('completada'),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidedBy: integer('voided_by').references(() => users.id),
@@ -59,4 +64,21 @@ export const saleDetails = pgTable(
     subtotalUsd: numeric('subtotal_usd', { precision: 14, scale: 2 }).notNull(),
   },
   (t) => [index('sale_details_sale_idx').on(t.saleId)],
+);
+
+/** Desglose del pago: cuánto se pagó con cada método (USD cubierto y Bs cobrado). */
+export const salePayments = pgTable(
+  'sale_payments',
+  {
+    id: serial('id').primaryKey(),
+    saleId: integer('sale_id')
+      .notNull()
+      .references(() => sales.id, { onDelete: 'cascade' }),
+    method: text('method').notNull(),
+    /** Valor cubierto en USD (canónico; la suma = total de la venta). */
+    amountUsd: numeric('amount_usd', { precision: 14, scale: 2 }).notNull(),
+    /** Bs realmente cobrado (0 en métodos USD; USD×USDT en métodos Bs). */
+    amountBs: numeric('amount_bs', { precision: 14, scale: 2 }).notNull().default('0'),
+  },
+  (t) => [index('sale_payments_sale_idx').on(t.saleId)],
 );

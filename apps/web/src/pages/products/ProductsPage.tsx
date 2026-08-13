@@ -32,10 +32,16 @@ import type { ProductRow } from '../../api/products.api';
 import { getApiErrorMessage } from '../../api/client';
 import { categoryOptions } from '../../lib/categories';
 import { useBrands, useCategories } from '../../hooks/useCatalogs';
+import { useCarBrands } from '../../hooks/useCarBrands';
+import { useCurrentRates } from '../../hooks/useExchangeRates';
 import { useProduct, useProducts, useUpdateProduct } from '../../hooks/useProducts';
 import { useAuthStore } from '../../stores/auth.store';
 
 const { Title, Text } = Typography;
+
+function formatBs(n: number): string {
+  return `Bs ${n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 interface Filters {
   page: number;
@@ -58,6 +64,10 @@ export function ProductsPage() {
   const products = useProducts(filters);
   const categories = useCategories();
   const brands = useBrands();
+  const carBrands = useCarBrands();
+  const rates = useCurrentRates();
+  const usdt = Number(rates.data?.usdt?.rateBsPerUsd ?? 0);
+  const bcv = Number(rates.data?.bcv?.rateBsPerUsd ?? 0);
   const updateProduct = useUpdateProduct();
   const preview = useProduct(previewId);
 
@@ -68,6 +78,10 @@ export function ProductsPage() {
   const brandMap = useMemo(
     () => new Map((brands.data ?? []).map((b) => [b.id, b.name])),
     [brands.data],
+  );
+  const carBrandMap = useMemo(
+    () => new Map((carBrands.data ?? []).map((b) => [b.id, b.name])),
+    [carBrands.data],
   );
 
   const openCreate = () => navigate('/productos/nuevo');
@@ -105,11 +119,26 @@ export function ProductsPage() {
       render: (id: number | null) => (id ? (categoryMap.get(id) ?? '—') : '—'),
     },
     {
-      title: 'Precio',
+      title: 'Precio USD',
       dataIndex: 'priceUsd',
       width: 110,
       align: 'right',
       render: (v: string) => <Text strong>{formatUsd(Number(v))}</Text>,
+    },
+    {
+      title: 'Precio Bs',
+      key: 'priceBs',
+      width: 130,
+      align: 'right',
+      render: (_, row) => (usdt > 0 ? formatBs(Number(row.priceUsd) * usdt) : '—'),
+    },
+    {
+      title: 'Precio USD (BCV)',
+      key: 'priceUsdBcv',
+      width: 130,
+      align: 'right',
+      render: (_, row) =>
+        usdt > 0 && bcv > 0 ? formatUsd((Number(row.priceUsd) * usdt) / bcv) : '—',
     },
     {
       title: 'Stock',
@@ -234,7 +263,7 @@ export function ProductsPage() {
           columns={columns}
           dataSource={products.data?.data ?? []}
           loading={products.isLoading}
-          scroll={{ x: 900 }}
+          scroll={{ x: 1200 }}
           pagination={{
             current: filters.page,
             pageSize: filters.limit,
@@ -280,19 +309,47 @@ export function ProductsPage() {
               <Descriptions.Item label="Código">{preview.data.code}</Descriptions.Item>
               <Descriptions.Item label="Nombre">{preview.data.name}</Descriptions.Item>
               <Descriptions.Item label="N° de pieza">{preview.data.partNumber}</Descriptions.Item>
-              <Descriptions.Item label="Categoría">
-                {preview.data.categoryId ? categoryMap.get(preview.data.categoryId) ?? '—' : '—'}
+              <Descriptions.Item label="Categorías">
+                {preview.data.categoryIds.length > 0
+                  ? preview.data.categoryIds.map((id) => categoryMap.get(id) ?? id).join(', ')
+                  : '—'}
               </Descriptions.Item>
               <Descriptions.Item label="Marca">
                 {preview.data.brandId ? brandMap.get(preview.data.brandId) ?? '—' : '—'}
               </Descriptions.Item>
-              <Descriptions.Item label="Años">
-                {preview.data.yearFrom || preview.data.yearTo
-                  ? `${preview.data.yearFrom ?? ''}${preview.data.yearTo ? ` - ${preview.data.yearTo}` : ''}`
-                  : '—'}
+              <Descriptions.Item label="Marca del carro">
+                {preview.data.carBrandId ? carBrandMap.get(preview.data.carBrandId) ?? '—' : '—'}
               </Descriptions.Item>
-              <Descriptions.Item label="Precio">
+              <Descriptions.Item label="Modelos compatibles">
+                {preview.data.carModels.length > 0 ? (
+                  <Space direction="vertical" size={2}>
+                    {preview.data.carModels.map((m) => {
+                      const years =
+                        m.yearFrom || m.yearTo
+                          ? ` ${m.yearFrom ?? ''}${m.yearTo ? `-${m.yearTo}` : ''}`
+                          : '';
+                      return (
+                        <span key={m.carModelId}>
+                          {m.name}
+                          {years}
+                        </span>
+                      );
+                    })}
+                  </Space>
+                ) : (
+                  '—'
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="Precio USD">
                 <Text strong>{formatUsd(Number(preview.data.priceUsd))}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Precio Bs">
+                {usdt > 0 ? formatBs(Number(preview.data.priceUsd) * usdt) : '—'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Precio USD (BCV)">
+                {usdt > 0 && bcv > 0
+                  ? formatUsd((Number(preview.data.priceUsd) * usdt) / bcv)
+                  : '—'}
               </Descriptions.Item>
               <Descriptions.Item label="Stock">
                 {preview.data.stock.toLocaleString('es-VE')}
