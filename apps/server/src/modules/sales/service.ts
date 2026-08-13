@@ -169,6 +169,36 @@ export async function list(f: SaleFilters) {
   return { rows, total: countResult[0]?.count ?? 0 };
 }
 
+/** Resumen agregado (conteo + suma USD/Bs) en SQL, sin traer filas. */
+export async function summary(f: {
+  from?: string;
+  to?: string;
+  status?: 'completada' | 'anulada';
+  userId?: number;
+}) {
+  const conditions: SQL[] = [];
+  if (f.userId) conditions.push(eq(sales.userId, f.userId));
+  if (f.status) conditions.push(eq(sales.status, f.status));
+  if (f.from) conditions.push(gte(sales.saleDate, new Date(`${f.from}T00:00:00`)));
+  if (f.to) conditions.push(lte(sales.saleDate, new Date(`${f.to}T23:59:59`)));
+  const where = conditions.length ? and(...conditions) : undefined;
+
+  const [row] = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+      totalUsd: sql<number>`coalesce(sum(${sales.totalUsd}), 0)::float`,
+      totalBs: sql<number>`coalesce(sum(${sales.totalBs}), 0)::float`,
+    })
+    .from(sales)
+    .where(where);
+
+  return {
+    count: row?.count ?? 0,
+    totalUsd: row?.totalUsd ?? 0,
+    totalBs: row?.totalBs ?? 0,
+  };
+}
+
 export async function getById(id: number) {
   const [sale] = await db
     .select({

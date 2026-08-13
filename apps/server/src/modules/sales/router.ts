@@ -4,6 +4,7 @@ import {
   createSaleSchema,
   idParamSchema,
   saleFiltersSchema,
+  salesSummaryQuerySchema,
 } from '@autopartes-air/shared';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/rbac';
@@ -33,6 +34,23 @@ salesRouter.get(
       const { rows, total } = await service.list(filters);
       const { page, limit } = req.query as unknown as { page: number; limit: number };
       paginated(res, rows, { page, limit, total });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Resumen agregado (dashboard). Debe ir ANTES de '/:id' para no ser capturado por él.
+salesRouter.get(
+  '/summary',
+  requirePermission(PERMISSIONS.SALES_READ_OWN, PERMISSIONS.SALES_READ_ALL),
+  validate(salesSummaryQuerySchema, 'query'),
+  async (req, res, next) => {
+    try {
+      const q = req.query as never as import('@autopartes-air/shared').SalesSummaryQuery;
+      // Sin permiso de "ver todas": el resumen se limita a las ventas propias.
+      if (!canSeeAll(req)) q.userId = req.user!.sub;
+      ok(res, await service.summary(q));
     } catch (err) {
       next(err);
     }

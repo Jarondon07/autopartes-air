@@ -19,6 +19,7 @@ import { rolesRouter } from './modules/roles/router';
 import { salesRouter } from './modules/sales/router';
 import { taxesRouter } from './modules/taxes/router';
 import { warehousesRouter } from './modules/warehouses/router';
+import { reportsRouter } from './modules/reports/router';
 import { usersRouter } from './modules/users/router';
 import { suppliersRouter } from './modules/suppliers/router';
 import { vehiclesRouter } from './modules/vehicles/router';
@@ -54,6 +55,7 @@ export function createApp() {
   app.use('/api/v1/car-models', carModelsRouter);
   app.use('/api/v1/taxes', taxesRouter);
   app.use('/api/v1/warehouses', warehousesRouter);
+  app.use('/api/v1/reports', reportsRouter);
 
   // Archivos subidos (logos, imágenes), servidos de forma estática.
   app.use('/uploads', express.static(uploadsDir));

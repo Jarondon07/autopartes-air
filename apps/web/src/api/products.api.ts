@@ -63,3 +63,9 @@ export async function updateProduct(
 export async function deleteProduct(id: number): Promise<void> {
   await api.delete(`/products/${id}`);
 }
+
+/** GET /products/low-stock — productos activos con stock ≤ stock mínimo. */
+export async function getLowStock(): Promise<Product[]> {
+  const { data } = await api.get<ApiSuccess<Product[]>>('/products/low-stock');
+  return data.data;
+}

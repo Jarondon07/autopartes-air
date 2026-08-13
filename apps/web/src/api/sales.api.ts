@@ -61,6 +61,22 @@ export async function listSales(params: {
   };
 }
 
+export interface SalesSummary {
+  count: number;
+  totalUsd: number;
+  totalBs: number;
+}
+
+/** GET /sales/summary — conteo + suma USD/Bs agregada en SQL. */
+export async function getSalesSummary(params: {
+  from?: string;
+  to?: string;
+  status?: SaleStatus;
+}): Promise<SalesSummary> {
+  const { data } = await api.get<ApiSuccess<SalesSummary>>('/sales/summary', { params });
+  return data.data;
+}
+
 export async function getSale(id: number): Promise<SaleDetail> {
   const { data } = await api.get<ApiSuccess<SaleDetail>>(`/sales/${id}`);
   return data.data;

@@ -25,6 +25,7 @@ import { RolesPage } from './pages/config/RolesPage';
 import { CarBrandsPage } from './pages/config/CarBrandsPage';
 import { TaxesPage } from './pages/config/TaxesPage';
 import { WarehousesPage } from './pages/config/WarehousesPage';
+import { ReportsPage } from './pages/reports/ReportsPage';
 
 /** Páginas ya implementadas, por ruta. El resto usa PlaceholderPage. */
 const IMPLEMENTED: Record<string, ReactNode> = {
@@ -35,6 +36,7 @@ const IMPLEMENTED: Record<string, ReactNode> = {
   '/ventas': <SalesListPage />,
   '/clientes': <ClientsPage />,
   '/proveedores': <SuppliersPage />,
+  '/reportes': <ReportsPage />,
   '/configuracion/usuarios': <UsersPage />,
   '/configuracion/roles': <RolesPage />,
   '/configuracion/categorias': <CategoriesPage />,

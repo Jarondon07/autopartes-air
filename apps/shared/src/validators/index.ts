@@ -11,3 +11,4 @@ export * from './sale';
 export * from './inventory';
 export * from './tax';
 export * from './warehouse';
+export * from './report';

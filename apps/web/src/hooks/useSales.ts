@@ -24,6 +24,13 @@ export function useSales(params: {
   });
 }
 
+export function useSalesSummary(params: { from?: string; to?: string; status?: SaleStatus }) {
+  return useQuery({
+    queryKey: [KEY, 'summary', params],
+    queryFn: () => salesApi.getSalesSummary(params),
+  });
+}
+
 export function useSale(id: number | null) {
   return useQuery({
     queryKey: [KEY, 'detail', id],

@@ -35,6 +35,15 @@ export const saleFiltersSchema = paginationSchema.extend({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+/** Resumen agregado de ventas (para dashboard/reportes): suma en SQL, sin filas. */
+export const salesSummaryQuerySchema = z.object({
+  userId: z.coerce.number().int().positive().optional(),
+  status: z.enum(['completada', 'anulada']).optional(),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+export type SalesSummaryQuery = z.infer<typeof salesSummaryQuerySchema>;
+
 export type SalePaymentInput = z.infer<typeof salePaymentInputSchema>;
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 export type SaleFilters = z.infer<typeof saleFiltersSchema>;
