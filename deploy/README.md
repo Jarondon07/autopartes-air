@@ -149,8 +149,11 @@ chown -R autopartes:autopartes /srv/autopartes-air
 - Los scripts `:prod` fijan `NODE_ENV=production` con `cross-env`, por eso leen `.env`.
 - El seed es idempotente (`onConflictDoNothing`) y **solo crea usuarios que no existan**:
   crea `root` y `admin` con la clave `Clave123*` → **cambiarlas en el primer login**.
-- Si `db:migrate:prod` falla, aplicar los `.sql` de `apps/server/src/db/migrations/` en
-  orden con `psql -U autopartes -d autopartes-air -f <archivo>.sql`.
+- `db:migrate:prod` usa `deploy/migrate.mjs` (el migrador de `drizzle-orm` directamente),
+  **no** `drizzle-kit migrate`: este último muere con exit 1 sin imprimir el error real,
+  tanto en Windows como en el VPS. El script sí reporta la causa (credenciales, permisos…).
+- Último recurso si aun así falla: aplicar los `.sql` de `apps/server/src/db/migrations/`
+  en orden con `psql -U autopartes -d autopartes-air -f <archivo>.sql`.
 
 ## 7. Servicio systemd
 
