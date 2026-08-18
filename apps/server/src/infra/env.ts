@@ -26,6 +26,13 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16, 'JWT_REFRESH_SECRET muy corto'),
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('7d'),
+  /**
+   * `secure` de la cookie del refresh token. Si no se define, sigue a `NODE_ENV`.
+   * Sobre HTTP (producción accedida por IP, sin dominio ni TLS) debe ser `false`:
+   * con `secure: true` el navegador descarta la cookie y la sesión se corta
+   * al vencer el access token (15 min). Ponerlo en `true` al montar HTTPS.
+   */
+  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
 
   // --- Worker de tasa BCV automática ---
   // Si RADAR_API_KEY está vacío, el worker no se activa (solo tasa manual).
@@ -52,5 +59,9 @@ if (!parsed.success) {
 export const env = parsed.data;
 export const isProd = env.NODE_ENV === 'production';
 export const isDev = env.NODE_ENV === 'development';
+/** `secure` efectivo de la cookie de refresh (env explícito o, si no, `isProd`). */
+export const cookieSecure = env.COOKIE_SECURE
+  ? env.COOKIE_SECURE === 'true'
+  : env.NODE_ENV === 'production';
 /** Archivo de entorno efectivamente cargado (útil para logs de arranque). */
 export const loadedEnvFile = envFile;

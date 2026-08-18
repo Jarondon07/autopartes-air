@@ -138,3 +138,15 @@ El menú de la web tiene la estructura completa. Rutas no implementadas enlazan 
 - Vite corre con `server.host: true` (en `vite.config.ts`) para poder abrir la web desde otros equipos de la LAN (`http://<ip>:4301`). Si no carga desde otro dispositivo, suele ser el **Firewall de Windows** bloqueando el 4301 (permitir en redes privadas). El proxy sigue apuntando a `localhost:4300` (la API no se expone a la red).
 - Nombre visible del sistema = "AutoparteAIR" (aunque el paquete npm es `autopartes-air`).
 - Los procesos `npm run dev:server` en background pueden dejar el puerto 4300 ocupado; si un arranque no imprime "escuchando", revisar/matar lo que esté en 4300.
+
+## Despliegue en producción (VPS)
+
+Guía completa y archivos de infraestructura en [deploy/README.md](deploy/README.md).
+
+- **Stack:** VPS Debian 13 con Node 22 + PostgreSQL + Nginx **nativos** (sin Docker). La API corre como servicio systemd (`deploy/autopartes-api.service`) en `127.0.0.1:4300`; Nginx (`deploy/nginx-autopartes-air.conf`) sirve `apps/web/dist`, hace proxy de `/api` y sirve `/uploads` como estático.
+- **Un solo origen:** la web usa baseURL relativa (`/api/v1`, `/uploads`), así que no hay CORS entre dominios ni variables `VITE_*`. Nada que configurar en el front al desplegar.
+- **`apps/desktop` no se despliega:** el clon en el VPS usa `git sparse-checkout set --no-cone '/*' '!/apps/desktop'`, y los `git pull` siguen excluyéndolo.
+- **`npm ci` completo (con devDependencies):** el server no se compila, corre TypeScript con `tsx` en runtime (`npm start`), y la web necesita `vite` para el build. Nunca usar `--omit=dev`.
+- **`COOKIE_SECURE`** (nueva env, opcional): controla el `secure` de la cookie del refresh token; si no se define sigue a `NODE_ENV`. Debe ser `false` mientras el sitio se sirva por **HTTP** (acceso por IP, sin dominio) — con `secure: true` sobre HTTP el navegador descarta la cookie y la sesión se corta a los 15 min. Poner `true` al montar HTTPS con certbot.
+- **`WorkingDirectory` del servicio = `apps/server`**: `infra/env.ts` carga `.env` y `lib/upload.ts` resuelve `uploads/` **relativos al cwd**.
+- **Actualizar:** `bash deploy/deploy.sh` (pull → `npm ci` → migraciones → build web → restart). **Respaldo:** `deploy/backup.sh` por cron (BD + `uploads/`, que no está en git).

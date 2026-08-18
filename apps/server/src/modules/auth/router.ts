@@ -4,7 +4,7 @@ import {
   loginSchema,
   updateProfileSchema,
 } from '@autopartes-air/shared';
-import { isProd } from '../../infra/env';
+import { cookieSecure } from '../../infra/env';
 import { requireAuth } from '../../middleware/auth';
 import { unauthorized } from '../../middleware/error';
 import { validate } from '../../middleware/validate';
@@ -18,7 +18,7 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 function setRefreshCookie(res: Response, token: string) {
   res.cookie(REFRESH_COOKIE, token, {
     httpOnly: true,
-    secure: isProd,
+    secure: cookieSecure,
     sameSite: 'lax',
     path: '/api/v1/auth',
     maxAge: SEVEN_DAYS_MS,
@@ -49,7 +49,13 @@ authRouter.post('/refresh', async (req, res, next) => {
 });
 
 authRouter.post('/logout', (_req, res) => {
-  res.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
+  // Los atributos deben coincidir con los de `setRefreshCookie` para que el borrado surta efecto.
+  res.clearCookie(REFRESH_COOKIE, {
+    httpOnly: true,
+    secure: cookieSecure,
+    sameSite: 'lax',
+    path: '/api/v1/auth',
+  });
   res.json({ success: true, data: null });
 });
 
