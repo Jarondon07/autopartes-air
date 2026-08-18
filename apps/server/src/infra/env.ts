@@ -31,8 +31,13 @@ const envSchema = z.object({
    * Sobre HTTP (producción accedida por IP, sin dominio ni TLS) debe ser `false`:
    * con `secure: true` el navegador descarta la cookie y la sesión se corta
    * al vencer el access token (15 min). Ponerlo en `true` al montar HTTPS.
+   *
+   * Se acepta vacío (`COOKIE_SECURE=` en el .env) como "no definido".
    */
-  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
+  COOKIE_SECURE: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['true', 'false']).optional(),
+  ),
 
   // --- Worker de tasa BCV automática ---
   // Si RADAR_API_KEY está vacío, el worker no se activa (solo tasa manual).
