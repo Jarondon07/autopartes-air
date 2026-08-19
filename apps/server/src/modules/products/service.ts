@@ -1,5 +1,6 @@
 import { and, asc, eq, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
 import {
+  UNIVERSAL_CAR_ABBR,
   buildProductSku,
   type CreateProductInput,
   type ProductCarModelInput,
@@ -25,10 +26,18 @@ const DUP_CODE = 'Ya existe un producto con ese número de pieza';
 /** Ejecutor de consultas: la conexión global o una transacción activa. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** Abreviaturas de categoría y marca del carro para armar el SKU. */
-async function skuParts(exec: Executor, categoryId?: number | null, carBrandId?: number | null) {
+/**
+ * Abreviaturas de categoría y marca del carro para armar el SKU.
+ * En un producto universal no hay marca: ocupa su lugar `UNIV`.
+ */
+async function skuParts(
+  exec: Executor,
+  categoryId?: number | null,
+  carBrandId?: number | null,
+  isUniversal = false,
+) {
   let categoryAbbr: string | null = null;
-  let carBrandAbbr: string | null = null;
+  let carBrandAbbr: string | null = isUniversal ? UNIVERSAL_CAR_ABBR : null;
   if (categoryId) {
     const [c] = await exec
       .select({ a: categories.abbreviation })
@@ -36,7 +45,7 @@ async function skuParts(exec: Executor, categoryId?: number | null, carBrandId?:
       .where(eq(categories.id, categoryId));
     categoryAbbr = c?.a ?? null;
   }
-  if (carBrandId) {
+  if (!isUniversal && carBrandId) {
     const [b] = await exec
       .select({ a: carBrands.abbreviation })
       .from(carBrands)
@@ -148,6 +157,14 @@ export async function list(f: ProductFilters) {
               .innerJoin(carModels, eq(carModels.id, productCarModels.carModelId))
               .where(ilike(carModels.name, like)),
           ),
+          // Los universales (gas, aceites) sirven para cualquier vehículo, así que
+          // responden a una palabra que sea una marca o un modelo existente. El
+          // EXISTS es la clave: sin él, un universal coincidiría con CUALQUIER
+          // palabra y "compresor" devolvería también el gas.
+          sql`${products.isUniversal} AND (
+            EXISTS (SELECT 1 FROM ${carBrands} WHERE ${carBrands.name} ILIKE ${like})
+            OR EXISTS (SELECT 1 FROM ${carModels} WHERE ${carModels.name} ILIKE ${like})
+          )`,
           // Marca del repuesto (ej. "Denso").
           inArray(
             products.brandId,
@@ -245,12 +262,19 @@ export async function create(input: CreateProductInput) {
   const primaryCategoryId = categoryIds?.[0] ?? null;
   return withUniqueGuard(DUP_CODE, () =>
     db.transaction(async (tx) => {
-      const { categoryAbbr, carBrandAbbr } = await skuParts(tx, primaryCategoryId, rest.carBrandId);
+      const { categoryAbbr, carBrandAbbr } = await skuParts(
+        tx,
+        primaryCategoryId,
+        rest.carBrandId,
+        rest.isUniversal ?? false,
+      );
       const code = buildProductSku(categoryAbbr, carBrandAbbr, partNumber);
       const [product] = await tx
         .insert(products)
         .values({
           ...rest,
+          // Un universal no lleva marca de carro, aunque el formulario la mande.
+          ...(rest.isUniversal && { carBrandId: null }),
           categoryId: primaryCategoryId,
           partNumber: partNumber.trim(),
           code,
@@ -261,7 +285,7 @@ export async function create(input: CreateProductInput) {
         .returning();
       if (!product) throw new Error('No se pudo crear el producto');
       await setCategories(tx, product.id, categoryIds ?? []);
-      await setCarModels(tx, product.id, carModels ?? []);
+      await setCarModels(tx, product.id, rest.isUniversal ? [] : carModels ?? []);
       await setImages(tx, product.id, images ?? []);
       return {
         ...product,
@@ -287,10 +311,22 @@ export async function update(id: number, input: UpdateProductInput) {
 
       // Recalcula el código si cambió el número de pieza, la categoría o la marca del carro.
       let codeUpdate: { code?: string; partNumber?: string } = {};
-      if (partNumber !== undefined || categoryIds !== undefined || rest.carBrandId !== undefined) {
+      if (
+        partNumber !== undefined ||
+        categoryIds !== undefined ||
+        rest.carBrandId !== undefined ||
+        rest.isUniversal !== undefined
+      ) {
+        const isUniversal =
+          rest.isUniversal !== undefined ? rest.isUniversal : existing.isUniversal;
         const carBrandId = rest.carBrandId !== undefined ? rest.carBrandId : existing.carBrandId;
         const pn = partNumber !== undefined ? partNumber : existing.partNumber;
-        const { categoryAbbr, carBrandAbbr } = await skuParts(tx, primaryCategoryId, carBrandId);
+        const { categoryAbbr, carBrandAbbr } = await skuParts(
+          tx,
+          primaryCategoryId,
+          carBrandId,
+          isUniversal,
+        );
         codeUpdate = {
           code: buildProductSku(categoryAbbr, carBrandAbbr, pn),
           ...(partNumber !== undefined && { partNumber: partNumber.trim() }),
@@ -301,6 +337,9 @@ export async function update(id: number, input: UpdateProductInput) {
         .update(products)
         .set({
           ...rest,
+          // Al volverse universal se suelta la marca del carro: si no, quedaría
+          // apuntando a la marca vieja aunque el SKU ya diga UNIV.
+          ...(rest.isUniversal && { carBrandId: null }),
           ...(categoryIds !== undefined && { categoryId: primaryCategoryId }),
           ...(costUsd !== undefined && { costUsd: costUsd.toString() }),
           ...(markupPct !== undefined && { markupPct: markupPct.toString() }),
@@ -314,7 +353,10 @@ export async function update(id: number, input: UpdateProductInput) {
       if (categoryIds !== undefined) {
         await setCategories(tx, id, categoryIds);
       }
-      if (carModels !== undefined) {
+      if (rest.isUniversal) {
+        // Al volverse universal se sueltan marca y modelos previos.
+        await setCarModels(tx, id, []);
+      } else if (carModels !== undefined) {
         await setCarModels(tx, id, carModels);
       }
       if (images !== undefined) {

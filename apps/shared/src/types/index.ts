@@ -128,6 +128,8 @@ export interface Product {
   categoryId: number | null;
   brandId: number | null;
   carBrandId: number | null;
+  /** Sirve para cualquier vehículo: sin marca ni modelos de carro. */
+  isUniversal: boolean;
   costUsd: string;
   markupPct: string;
   priceUsd: string;

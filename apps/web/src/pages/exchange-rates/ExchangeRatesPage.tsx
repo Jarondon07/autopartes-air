@@ -14,6 +14,7 @@ import { useCurrentRates, useRates, useRefreshRates } from '../../hooks/useExcha
 import { useAuthStore } from '../../stores/auth.store';
 import { RateFormModal } from './RateFormModal';
 import { DataTable } from '../../components/DataTable';
+import { formatDate } from '../../lib/datetime';
 
 const { Title, Text } = Typography;
 
@@ -71,7 +72,7 @@ export function ExchangeRatesPage() {
       title: 'Fecha',
       dataIndex: 'rateDate',
       width: 140,
-      render: (d: string) => dayjs(d).format('DD/MM/YYYY'),
+      render: (d: string) => formatDate(d),
     },
     {
       title: 'Fuente',
@@ -176,7 +177,7 @@ export function ExchangeRatesPage() {
           loading={rates.isLoading}
           mobileCard={(r) => ({
             title: <Text strong>{formatRate(r.rateBsPerUsd)} Bs / USD</Text>,
-            subtitle: dayjs(r.rateDate).format('DD/MM/YYYY'),
+            subtitle: formatDate(r.rateDate),
             tags: (
               <>
                 <Tag color={SOURCE_COLOR[r.source] ?? 'default'}>

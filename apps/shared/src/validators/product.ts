@@ -27,10 +27,19 @@ const productBaseSchema = z.object({
   carBrandId: z.number().int().positive().nullish(),
   /** Modelos del carro a los que sirve, cada uno con su rango de años. */
   carModels: z.array(productCarModelSchema).optional(),
+  /**
+   * Sirve para cualquier vehículo (gas refrigerante, aceites, limpiadores).
+   * Cuando es `true`, marca y modelos del carro dejan de ser obligatorios.
+   */
+  isUniversal: z.boolean().optional(),
   // El costo se define al registrar la compra (último costo); opcional al crear.
   costUsd: moneySchema.optional(),
   markupPct: z.coerce.number().min(0).max(999.99),
-  stock: z.number().int().min(0).default(0),
+  /**
+   * El stock NO se fija a mano al crear el producto: nace en 0 y entra por
+   * compras o ajustes, para que cada unidad tenga su movimiento en el
+   * historial de inventario.
+   */
   minStock: z.number().int().min(0).default(0),
   warehouseId: z.number().int().positive().nullish(),
   /** URLs de imágenes en orden de visualización (la primera es la principal). */
@@ -44,12 +53,14 @@ export const createProductSchema = productBaseSchema.superRefine((v, ctx) => {
   };
   require((v.categoryIds?.length ?? 0) > 0, 'categoryIds', 'Selecciona al menos una categoría');
   require(v.brandId != null, 'brandId', 'Selecciona la marca del repuesto');
-  require(v.carBrandId != null, 'carBrandId', 'Selecciona la marca del carro');
-  require((v.carModels?.length ?? 0) > 0, 'carModels', 'Agrega al menos un modelo compatible');
+  // Un producto universal no lleva marca ni modelos: sirve para todos los carros.
+  if (!v.isUniversal) {
+    require(v.carBrandId != null, 'carBrandId', 'Selecciona la marca del carro');
+    require((v.carModels?.length ?? 0) > 0, 'carModels', 'Agrega al menos un modelo compatible');
+  }
 });
 
 export const updateProductSchema = productBaseSchema
-  .omit({ stock: true })
   .partial()
   .extend({ isActive: z.boolean().optional() });
 

@@ -14,6 +14,7 @@ import type { SaleRow } from '../api/sales.api';
 import { useLowStock, useProducts } from '../hooks/useProducts';
 import { useSales, useSalesSummary } from '../hooks/useSales';
 import { useCurrentRates } from '../hooks/useExchangeRates';
+import { formatDate, formatShortDateTime } from '../lib/datetime';
 
 const { Title, Text } = Typography;
 
@@ -85,7 +86,7 @@ export function DashboardPage() {
       title: 'Fecha',
       dataIndex: 'saleDate',
       width: 130,
-      render: (d: string) => dayjs(d).format('DD/MM HH:mm'),
+      render: (d: string) => formatShortDateTime(d),
     },
     {
       title: 'Cliente',
@@ -114,7 +115,7 @@ export function DashboardPage() {
         <strong>Dashboard</strong>
       </Title>
       <Text type="secondary">
-        Resumen del día · {dayjs().format('DD/MM/YYYY')}
+        Resumen del día · {formatDate(new Date())}
         {bcv > 0 && ` · BCV ${bcv.toLocaleString('es-VE')}`}
         {usdt > 0 && ` · USDT ${usdt.toLocaleString('es-VE')}`}
       </Text>

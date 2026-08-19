@@ -12,6 +12,7 @@ import {
   useTopProducts,
 } from '../../hooks/useReports';
 import { useAuthStore } from '../../stores/auth.store';
+import { formatDate } from '../../lib/datetime';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -48,7 +49,7 @@ export function ReportsPage() {
   const maxUsd = Math.max(1, ...dailyRows.map((r) => r.totalUsd));
 
   const dailyColumns: ColumnsType<SalesDailyRow> = [
-    { title: 'Día', dataIndex: 'date', width: 120, render: (d: string) => dayjs(d).format('DD/MM/YYYY') },
+    { title: 'Día', dataIndex: 'date', width: 120, render: (d: string) => formatDate(d) },
     { title: 'Ventas', dataIndex: 'count', width: 80, align: 'right' },
     {
       title: 'Total USD',

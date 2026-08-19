@@ -18,7 +18,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CreateProductInput, UpdateProductInput } from '@autopartes-air/shared';
-import { buildProductSku } from '@autopartes-air/shared';
+import { UNIVERSAL_CAR_ABBR, buildProductSku } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
 import { createBrand } from '../../api/catalogs.api';
 import { ProductImagesInput } from '../../components/ProductImagesInput';
@@ -51,7 +51,6 @@ interface FormValues {
   carModels?: CarModelRow[];
   partNumber: string;
   markupPct: number;
-  stock: number;
   minStock: number;
   warehouseId?: number;
   shortDescription?: string;
@@ -65,6 +64,14 @@ function blankToUndefined(v?: string) {
 }
 
 const FICHA_TEMPLATE = '• Material: ';
+
+/**
+ * Valor del select de marca de carro que representa "sirve para todos".
+ * Es un centinela de UI: al guardar se traduce a `isUniversal: true` con
+ * `carBrandId: null`, para no ensuciar el catálogo de marcas con una entrada
+ * falsa llamada "Todas".
+ */
+const UNIVERSAL_CAR_BRAND = -1;
 
 /** Etiqueta legible por campo, para el resumen de validación. */
 const FIELD_LABELS: Record<string, string> = {
@@ -103,7 +110,9 @@ export function ProductFormPage() {
   const updateProduct = useUpdateProduct();
 
   const carBrandId = Form.useWatch('carBrandId', form);
-  const carModels = useCarModels(carBrandId ?? null);
+  /** Producto universal (gas, aceites): sin marca ni modelos de carro. */
+  const isUniversal = carBrandId === UNIVERSAL_CAR_BRAND;
+  const carModels = useCarModels(isUniversal ? null : carBrandId ?? null);
   const selectedModels = Form.useWatch('carModels', form);
   const [images, setImages] = useState<string[]>([]);
   const [missingFields, setMissingFields] = useState<string[]>([]);
@@ -130,7 +139,9 @@ export function ProductFormPage() {
         name: detail.data.name,
         categoryIds: detail.data.categoryIds,
         brand: brandName,
-        carBrandId: detail.data.carBrandId ?? undefined,
+        carBrandId: detail.data.isUniversal
+          ? UNIVERSAL_CAR_BRAND
+          : detail.data.carBrandId ?? undefined,
         carModels: detail.data.carModels.map((m) => ({
           carModelId: m.carModelId,
           yearFrom: m.yearFrom ?? undefined,
@@ -138,7 +149,6 @@ export function ProductFormPage() {
         })),
         partNumber: detail.data.partNumber,
         markupPct: Number(detail.data.markupPct),
-        stock: detail.data.stock,
         minStock: detail.data.minStock,
         warehouseId: detail.data.warehouseId ?? undefined,
         shortDescription: detail.data.shortDescription ?? undefined,
@@ -151,7 +161,7 @@ export function ProductFormPage() {
 
   useEffect(() => {
     if (!isEdit) {
-      form.setFieldsValue({ markupPct: 30, stock: 0, minStock: 0, description: FICHA_TEMPLATE });
+      form.setFieldsValue({ markupPct: 30, minStock: 0, description: FICHA_TEMPLATE });
     }
   }, [isEdit, form]);
 
@@ -159,7 +169,9 @@ export function ProductFormPage() {
   const partNumber = Form.useWatch('partNumber', form);
   const primaryCategoryId = categoryIds?.[0];
   const catAbbr = categories.data?.find((c) => c.id === primaryCategoryId)?.abbreviation;
-  const carAbbr = carBrands.data?.find((b) => b.id === carBrandId)?.abbreviation;
+  const carAbbr = isUniversal
+    ? UNIVERSAL_CAR_ABBR
+    : carBrands.data?.find((b) => b.id === carBrandId)?.abbreviation;
   const codePreview = partNumber?.trim()
     ? buildProductSku(catAbbr, carAbbr, partNumber)
     : '(se genera con categoría, marca del carro y número de pieza)';
@@ -197,14 +209,17 @@ export function ProductFormPage() {
       partNumber: values.partNumber.trim(),
       categoryIds: values.categoryIds ?? [],
       brandId,
-      carBrandId: values.carBrandId,
-      carModels: (values.carModels ?? [])
-        .filter((m) => m.carModelId != null)
-        .map((m) => ({
-          carModelId: m.carModelId!,
-          yearFrom: m.yearFrom ?? null,
-          yearTo: m.yearTo ?? null,
-        })),
+      carBrandId: isUniversal ? null : values.carBrandId,
+      isUniversal,
+      carModels: isUniversal
+        ? []
+        : (values.carModels ?? [])
+            .filter((m) => m.carModelId != null)
+            .map((m) => ({
+              carModelId: m.carModelId!,
+              yearFrom: m.yearFrom ?? null,
+              yearTo: m.yearTo ?? null,
+            })),
       markupPct: values.markupPct,
       minStock: values.minStock,
       warehouseId: values.warehouseId ?? null,
@@ -219,7 +234,8 @@ export function ProductFormPage() {
         await updateProduct.mutateAsync({ id: productId, input });
         message.success('Producto actualizado');
       } else {
-        const input: CreateProductInput = { ...base, stock: values.stock };
+        // El stock no se fija aquí: nace en 0 y entra con la compra o un ajuste.
+        const input: CreateProductInput = base;
         await createProduct.mutateAsync(input);
         message.success('Producto creado');
       }
@@ -313,7 +329,13 @@ export function ProductFormPage() {
                   placeholder="Seleccionar marca"
                   loading={carBrands.isLoading}
                   onChange={() => form.setFieldsValue({ carModels: [] })}
-                  options={(carBrands.data ?? []).map((b) => ({ value: b.id, label: b.name }))}
+                  options={[
+                    {
+                      value: UNIVERSAL_CAR_BRAND,
+                      label: 'Todas las marcas (universal)',
+                    },
+                    ...(carBrands.data ?? []).map((b) => ({ value: b.id, label: b.name })),
+                  ]}
                 />
               </Form.Item>
             </Col>
@@ -332,11 +354,22 @@ export function ProductFormPage() {
             label="Modelos compatibles (cada uno con su rango de años)"
             style={{ marginBottom: 0 }}
           >
+            {isUniversal && (
+              <Alert
+                type="success"
+                showIcon
+                style={{ marginBottom: 8 }}
+                message="Todos los modelos"
+                description="Este producto sirve para cualquier vehículo, así que no lleva marca ni modelos. Aparecerá al buscar por cualquier marca o modelo en el cajero."
+              />
+            )}
             <Form.List
               name="carModels"
               rules={[
                 {
                   validator: async (_, models) => {
+                    // Un universal no lleva modelos: la regla no aplica.
+                    if (isUniversal) return Promise.resolve();
                     if (!models || models.length < 1) {
                       return Promise.reject(new Error('Agrega al menos un modelo compatible'));
                     }
@@ -346,7 +379,7 @@ export function ProductFormPage() {
             >
               {(fields, { add, remove }, { errors }) => (
                 <>
-                  {fields.map((field) => (
+                  {(isUniversal ? [] : fields).map((field) => (
                     <Row gutter={12} key={field.key} align="top" wrap={false}>
                       <Col flex="auto">
                         <Form.Item
@@ -399,15 +432,17 @@ export function ProductFormPage() {
                       </Col>
                     </Row>
                   ))}
-                  <Button
-                    type="dashed"
-                    icon={<PlusOutlined />}
-                    onClick={() => add({})}
-                    disabled={!carBrandId}
-                    block
-                  >
-                    Agregar modelo
-                  </Button>
+                  {!isUniversal && (
+                    <Button
+                      type="dashed"
+                      icon={<PlusOutlined />}
+                      onClick={() => add({})}
+                      disabled={!carBrandId}
+                      block
+                    >
+                      Agregar modelo
+                    </Button>
+                  )}
                   {!carBrandId && (
                     <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
                       Elige primero la marca del carro.
@@ -421,7 +456,9 @@ export function ProductFormPage() {
 
           <Form.Item
             label="Código (SKU)"
-            extra="Formato: [abrev. categoría][abrev. marca del carro]-[nº pieza]. Se genera automáticamente."
+            extra={`Formato: [abrev. categoría][abrev. marca del carro]-[nº pieza]. Se genera automáticamente.${
+              isUniversal ? ` En los universales la marca es ${UNIVERSAL_CAR_ABBR}.` : ''
+            }`}
           >
             <Input value={codePreview} disabled />
           </Form.Item>
@@ -448,17 +485,16 @@ export function ProductFormPage() {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col xs={24} md={8}>
-              <Form.Item name="stock" label={isEdit ? 'Stock (ajustar en Inventario)' : 'Stock inicial'}>
-                <QuantityInput disabled={isEdit} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={8}>
-              <Form.Item name="minStock" label="Stock mínimo">
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="minStock"
+                label="Stock mínimo"
+                extra="Aviso de stock bajo. Las existencias entran por Compras o por un ajuste en Inventario."
+              >
                 <QuantityInput />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
+            <Col xs={24} md={12}>
               <Form.Item name="warehouseId" label="Almacén">
                 <Select
                   allowClear

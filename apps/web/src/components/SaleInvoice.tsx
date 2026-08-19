@@ -1,7 +1,7 @@
 import { Descriptions, Table, Tag, Typography } from 'antd';
-import dayjs from 'dayjs';
 import { PAYMENT_METHOD_LABELS, formatUsd } from '@autopartes-air/shared';
 import type { SaleDetail } from '../api/sales.api';
+import { formatDateTime } from '../lib/datetime';
 
 const { Text, Title } = Typography;
 
@@ -30,7 +30,7 @@ export function SaleInvoice({ sale }: { sale: SaleDetail }) {
         </Descriptions.Item>
         <Descriptions.Item label="Cliente">{sale.clientName || 'Contado'}</Descriptions.Item>
         <Descriptions.Item label="Fecha">
-          {dayjs(sale.saleDate).format('DD/MM/YYYY HH:mm')}
+          {formatDateTime(sale.saleDate)}
         </Descriptions.Item>
         <Descriptions.Item label="Pago">
           {(sale.payments?.length ?? 0) > 0

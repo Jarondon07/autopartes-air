@@ -85,10 +85,18 @@ export function ProductPreview({ productId }: { productId: number | null }) {
           {p.brandId ? brandMap.get(p.brandId) ?? '—' : '—'}
         </Descriptions.Item>
         <Descriptions.Item label="Marca del carro">
-          {p.carBrandId ? carBrandMap.get(p.carBrandId) ?? '—' : '—'}
+          {p.isUniversal ? (
+            <Tag color="blue">Todas las marcas</Tag>
+          ) : p.carBrandId ? (
+            carBrandMap.get(p.carBrandId) ?? '—'
+          ) : (
+            '—'
+          )}
         </Descriptions.Item>
         <Descriptions.Item label="Modelos compatibles">
-          {p.carModels.length > 0 ? (
+          {p.isUniversal ? (
+            <Tag color="blue">Todos los modelos</Tag>
+          ) : p.carModels.length > 0 ? (
             <Space direction="vertical" size={2}>
               {p.carModels.map((m) => {
                 const years =

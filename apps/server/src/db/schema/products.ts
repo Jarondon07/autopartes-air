@@ -26,6 +26,8 @@ export const products = pgTable(
     categoryId: integer('category_id').references(() => categories.id),
     brandId: integer('brand_id').references(() => brands.id),
     carBrandId: integer('car_brand_id').references(() => carBrands.id),
+    /** Sirve para cualquier vehículo (gas, aceites): sin marca ni modelos. */
+    isUniversal: boolean('is_universal').notNull().default(false),
     costUsd: numeric('cost_usd', { precision: 14, scale: 2 }).notNull().default('0'),
     markupPct: numeric('markup_pct', { precision: 5, scale: 2 }).notNull().default('30'),
     // Columna generada: precio de venta = costo × (1 + markup), redondeado SIEMPRE

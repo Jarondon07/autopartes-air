@@ -155,6 +155,13 @@
       "when": 1787103233782,
       "tag": "0021_faithful_silver_fox",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787151102959,
+      "tag": "0022_zippy_cerebro",
+      "breakpoints": true
     }
   ]
 }

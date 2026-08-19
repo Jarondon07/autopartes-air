@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Card, Select, Space, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import {
   MOVEMENT_TYPES,
   MOVEMENT_TYPE_LABELS,
@@ -14,6 +13,7 @@ import { DataTable } from '../../components/DataTable';
 import { useMovements } from '../../hooks/useInventory';
 import { useAuthStore } from '../../stores/auth.store';
 import { AdjustmentModal } from './AdjustmentModal';
+import { formatDateTime } from '../../lib/datetime';
 
 const { Title, Text } = Typography;
 
@@ -40,7 +40,7 @@ export function InventoryPage() {
       title: 'Fecha',
       dataIndex: 'createdAt',
       width: 150,
-      render: (d: string) => dayjs(d).format('DD/MM/YYYY HH:mm'),
+      render: (d: string) => formatDateTime(d),
     },
     {
       title: 'Producto',
@@ -138,7 +138,7 @@ export function InventoryPage() {
                 <Text strong>{m.productCode}</Text> — {m.productName}
               </span>
             ),
-            subtitle: dayjs(m.createdAt).format('DD/MM/YYYY HH:mm'),
+            subtitle: formatDateTime(m.createdAt),
             tags: <Tag color={TYPE_COLOR[m.movementType]}>{MOVEMENT_TYPE_LABELS[m.movementType]}</Tag>,
             fields: [
               {

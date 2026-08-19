@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Card, Descriptions, Drawer, Table, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import { PERMISSIONS, formatUsd } from '@autopartes-air/shared';
 import type { PurchaseRow } from '../../api/purchases.api';
 import { DataTable } from '../../components/DataTable';
 import { usePurchase, usePurchases } from '../../hooks/usePurchases';
 import { useAuthStore } from '../../stores/auth.store';
 import { PurchaseFormModal } from './PurchaseFormModal';
+import { formatDateTime } from '../../lib/datetime';
 
 const { Title, Text } = Typography;
 
@@ -33,7 +33,7 @@ export function PurchasesPage() {
       title: 'Fecha',
       dataIndex: 'purchaseDate',
       width: 150,
-      render: (d: string) => dayjs(d).format('DD/MM/YYYY HH:mm'),
+      render: (d: string) => formatDateTime(d),
     },
     { title: 'Proveedor', dataIndex: 'supplierName' },
     {
@@ -103,7 +103,7 @@ export function PurchasesPage() {
           loading={purchases.isLoading}
           mobileCard={(pu) => ({
             title: pu.supplierName,
-            subtitle: dayjs(pu.purchaseDate).format('DD/MM/YYYY HH:mm'),
+            subtitle: formatDateTime(pu.purchaseDate),
             fields: [
               { label: 'Factura', value: pu.invoiceNumber || <Text type="secondary">—</Text> },
               { label: 'Total USD', value: <Text strong>{formatUsd(Number(pu.totalUsd))}</Text> },
@@ -148,7 +148,7 @@ export function PurchasesPage() {
                 {detail.data.invoiceNumber || '—'}
               </Descriptions.Item>
               <Descriptions.Item label="Fecha">
-                {dayjs(detail.data.purchaseDate).format('DD/MM/YYYY HH:mm')}
+                {formatDateTime(detail.data.purchaseDate)}
               </Descriptions.Item>
               <Descriptions.Item label="Tasa (snapshot)">
                 {formatBs(detail.data.exchangeRate)} / USD

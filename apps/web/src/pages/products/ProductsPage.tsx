@@ -157,10 +157,18 @@ export function ProductsPage() {
     },
     {
       title: 'Estado',
-      dataIndex: 'isActive',
-      width: 100,
-      render: (active: boolean) =>
-        active ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>,
+      key: 'estado',
+      width: 150,
+      render: (_, p) => (
+        <Space size={4} wrap>
+          {p.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>}
+          {p.isUniversal && (
+            <Tag color="blue" title="Sirve para cualquier vehículo">
+              Universal
+            </Tag>
+          )}
+        </Space>
+      ),
     },
     {
       title: '',
@@ -287,6 +295,7 @@ export function ProductsPage() {
                   {p.stock <= p.minStock ? ' ⚠' : ''}
                 </Tag>
                 {p.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>}
+                {p.isUniversal && <Tag color="blue">Universal</Tag>}
               </>
             ),
             fields: [
@@ -374,10 +383,18 @@ export function ProductsPage() {
                 {preview.data.brandId ? brandMap.get(preview.data.brandId) ?? '—' : '—'}
               </Descriptions.Item>
               <Descriptions.Item label="Marca del carro">
-                {preview.data.carBrandId ? carBrandMap.get(preview.data.carBrandId) ?? '—' : '—'}
+                {preview.data.isUniversal ? (
+                  <Tag color="blue">Todas las marcas</Tag>
+                ) : preview.data.carBrandId ? (
+                  carBrandMap.get(preview.data.carBrandId) ?? '—'
+                ) : (
+                  '—'
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Modelos compatibles">
-                {preview.data.carModels.length > 0 ? (
+                {preview.data.isUniversal ? (
+                  <Tag color="blue">Todos los modelos</Tag>
+                ) : preview.data.carModels.length > 0 ? (
                   <Space direction="vertical" size={2}>
                     {preview.data.carModels.map((m) => {
                       const years =

@@ -497,6 +497,7 @@ export function CajeroPage() {
                               <Tag color={warehouse ? 'blue' : undefined}>
                                 {warehouse ? `Almacén: ${warehouse}` : 'Sin almacén'}
                               </Tag>
+                              {p.isUniversal && <Tag color="purple">Universal</Tag>}
                             </Space>
                           </div>
                           <div

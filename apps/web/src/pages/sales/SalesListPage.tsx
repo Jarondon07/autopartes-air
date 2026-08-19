@@ -13,7 +13,6 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import {
   PAYMENT_METHOD_LABELS,
@@ -26,6 +25,7 @@ import { getApiErrorMessage } from '../../api/client';
 import { DataTable } from '../../components/DataTable';
 import { useSale, useSales, useVoidSale } from '../../hooks/useSales';
 import { useAuthStore } from '../../stores/auth.store';
+import { formatDateTime } from '../../lib/datetime';
 
 const { Title, Text } = Typography;
 
@@ -81,7 +81,7 @@ export function SalesListPage() {
       title: 'Fecha',
       dataIndex: 'saleDate',
       width: 150,
-      render: (d: string) => dayjs(d).format('DD/MM/YYYY HH:mm'),
+      render: (d: string) => formatDateTime(d),
     },
     {
       title: 'Cliente',
@@ -186,7 +186,7 @@ export function SalesListPage() {
               <span>
                 #{sale.id}{' '}
                 <Text type="secondary" style={{ fontWeight: 400 }}>
-                  {dayjs(sale.saleDate).format('DD/MM/YYYY HH:mm')}
+                  {formatDateTime(sale.saleDate)}
                 </Text>
               </span>
             ),
@@ -246,7 +246,7 @@ export function SalesListPage() {
                 {detail.data.clientName || 'Contado'}
               </Descriptions.Item>
               <Descriptions.Item label="Fecha">
-                {dayjs(detail.data.saleDate).format('DD/MM/YYYY HH:mm')}
+                {formatDateTime(detail.data.saleDate)}
               </Descriptions.Item>
               <Descriptions.Item label="Pago">
                 {(detail.data.payments?.length ?? 0) > 0
