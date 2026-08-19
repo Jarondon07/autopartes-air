@@ -6,7 +6,7 @@ import {
   PlusOutlined,
   StopOutlined,
 } from '@ant-design/icons';
-import { App, Button, Card, Space, Table, Tag, Typography } from 'antd';
+import { App, Button, Card, Space, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { Category } from '@autopartes-air/shared';
 import { PERMISSIONS } from '@autopartes-air/shared';
@@ -19,6 +19,7 @@ import {
 } from '../../hooks/useCatalogs';
 import { useAuthStore } from '../../stores/auth.store';
 import { CategoryFormModal } from './CategoryFormModal';
+import { DataTable } from '../../components/DataTable';
 
 const { Title, Text } = Typography;
 
@@ -160,6 +161,9 @@ export function CategoriesPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En teléfono el título y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -177,11 +181,50 @@ export function CategoriesPage() {
       </div>
 
       <Card>
-        <Table<Category>
+        <DataTable<Category>
           rowKey="id"
           columns={columns}
           dataSource={categories.data ?? []}
           loading={categories.isLoading}
+          mobileCard={(c) => ({
+            title: c.name,
+            subtitle: (
+              <>
+                <Tag>{formatCategoryCode(c.id)}</Tag>
+                {c.abbreviation ? `Abrev. ${c.abbreviation}` : ''}
+              </>
+            ),
+            tags: c.isActive ? <Tag color="success">Activa</Tag> : <Tag>Inactiva</Tag>,
+            fields: [c.description ? { label: 'Descripcion', value: c.description } : null],
+            actions: (
+              <>
+                {canUpdate && (
+                  <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(c)}>
+                    Editar
+                  </Button>
+                )}
+                {canUpdate && (
+                  <Button
+                    size="small"
+                    icon={c.isActive ? <StopOutlined /> : <CheckCircleOutlined />}
+                    onClick={() => toggleActive(c)}
+                  >
+                    {c.isActive ? 'Desactivar' : 'Activar'}
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => confirmDelete(c)}
+                  >
+                    Eliminar
+                  </Button>
+                )}
+              </>
+            ),
+          })}
           pagination={{ pageSize: 20, showTotal: (t) => `${t} categorías` }}
         />
       </Card>

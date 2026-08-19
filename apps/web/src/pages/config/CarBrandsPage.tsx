@@ -21,6 +21,7 @@ import {
 import { useAuthStore } from '../../stores/auth.store';
 import { CarBrandFormModal } from './CarBrandFormModal';
 import { CarModelsDrawer } from './CarModelsDrawer';
+import { DataTable } from '../../components/DataTable';
 
 const { Title, Text } = Typography;
 
@@ -174,6 +175,9 @@ export function CarBrandsPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -191,11 +195,54 @@ export function CarBrandsPage() {
       </div>
 
       <Card>
-        <Table<CarBrand>
+        <DataTable<CarBrand>
           rowKey="id"
           columns={columns}
           dataSource={brands.data ?? []}
           loading={brands.isLoading}
+          mobileCard={(b) => ({
+            avatar: b.logoUrl ? (
+              <img
+                src={b.logoUrl}
+                alt={b.name}
+                style={{ width: 56, height: 40, objectFit: 'contain' }}
+              />
+            ) : (
+              <CarOutlined style={{ fontSize: 24, color: '#bfbfbf' }} />
+            ),
+            title: b.name,
+            tags: b.isActive ? <Tag color="success">Activa</Tag> : <Tag>Inactiva</Tag>,
+            actions: (
+              <>
+                <Button
+                  size="small"
+                  icon={<AppstoreOutlined />}
+                  onClick={() => setModelsBrand(b)}
+                >
+                  Modelos
+                </Button>
+                {canUpdate && (
+                  <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(b)}>
+                    Editar
+                  </Button>
+                )}
+                {canUpdate && (
+                  <Button
+                    size="small"
+                    icon={b.isActive ? <StopOutlined /> : <CheckCircleOutlined />}
+                    onClick={() => toggleActive(b)}
+                  >
+                    {b.isActive ? 'Desactivar' : 'Activar'}
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button size="small" danger icon={<DeleteOutlined />} onClick={() => confirmDelete(b)}>
+                    Eliminar
+                  </Button>
+                )}
+              </>
+            ),
+          })}
           pagination={{ pageSize: 20, showTotal: (t) => `${t} marcas` }}
         />
       </Card>

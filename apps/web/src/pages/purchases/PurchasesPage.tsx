@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { PERMISSIONS, formatUsd } from '@autopartes-air/shared';
 import type { PurchaseRow } from '../../api/purchases.api';
+import { DataTable } from '../../components/DataTable';
 import { usePurchase, usePurchases } from '../../hooks/usePurchases';
 import { useAuthStore } from '../../stores/auth.store';
 import { PurchaseFormModal } from './PurchaseFormModal';
@@ -75,6 +76,9 @@ export function PurchasesPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -92,11 +96,25 @@ export function PurchasesPage() {
       </div>
 
       <Card>
-        <Table<PurchaseRow>
+        <DataTable<PurchaseRow>
           rowKey="id"
           columns={columns}
           dataSource={purchases.data?.data ?? []}
           loading={purchases.isLoading}
+          mobileCard={(pu) => ({
+            title: pu.supplierName,
+            subtitle: dayjs(pu.purchaseDate).format('DD/MM/YYYY HH:mm'),
+            fields: [
+              { label: 'Factura', value: pu.invoiceNumber || <Text type="secondary">—</Text> },
+              { label: 'Total USD', value: <Text strong>{formatUsd(Number(pu.totalUsd))}</Text> },
+              { label: 'Total Bs', value: formatBs(pu.totalBs) },
+            ],
+            actions: (
+              <Button size="small" type="primary" ghost onClick={() => setDetailId(pu.id)}>
+                Ver compra
+              </Button>
+            ),
+          })}
           pagination={{
             current: page,
             pageSize: limit,
@@ -144,6 +162,7 @@ export function PurchasesPage() {
               rowKey="id"
               size="small"
               pagination={false}
+              scroll={{ x: 'max-content' }}
               dataSource={detail.data.details}
               columns={[
                 {

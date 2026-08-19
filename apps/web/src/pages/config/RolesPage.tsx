@@ -126,6 +126,8 @@ export function RolesPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 8,
         }}
       >

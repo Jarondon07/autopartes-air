@@ -23,6 +23,7 @@ import {
 } from '@autopartes-air/shared';
 import type { SaleRow } from '../../api/sales.api';
 import { getApiErrorMessage } from '../../api/client';
+import { DataTable } from '../../components/DataTable';
 import { useSale, useSales, useVoidSale } from '../../hooks/useSales';
 import { useAuthStore } from '../../stores/auth.store';
 
@@ -134,6 +135,9 @@ export function SalesListPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -172,11 +176,37 @@ export function SalesListPage() {
           />
         </Space>
 
-        <Table<SaleRow>
+        <DataTable<SaleRow>
           rowKey="id"
           columns={columns}
           dataSource={sales.data?.data ?? []}
           loading={sales.isLoading}
+          mobileCard={(sale) => ({
+            title: (
+              <span>
+                #{sale.id}{' '}
+                <Text type="secondary" style={{ fontWeight: 400 }}>
+                  {dayjs(sale.saleDate).format('DD/MM/YYYY HH:mm')}
+                </Text>
+              </span>
+            ),
+            subtitle: sale.clientName || 'Contado',
+            tags: <StatusTag status={sale.status} />,
+            fields: [
+              { label: 'Total USD', value: <Text strong>{formatUsd(Number(sale.totalUsd))}</Text> },
+              { label: 'Total Bs', value: formatBs(sale.totalBs) },
+              {
+                label: 'Pago',
+                value:
+                  (sale.paymentMethods ?? []).map((m) => PAYMENT_METHOD_LABELS[m]).join(', ') || '—',
+              },
+            ],
+            actions: (
+              <Button size="small" type="primary" ghost onClick={() => setDetailId(sale.id)}>
+                Ver factura
+              </Button>
+            ),
+          })}
           pagination={{
             current: page,
             pageSize: limit,
@@ -196,6 +226,7 @@ export function SalesListPage() {
         onClose={() => setDetailId(null)}
         title={`Factura #${detailId ?? ''}`}
         width={640}
+        styles={{ body: { paddingInline: 16 } }}
         loading={detail.isLoading}
         extra={
           detail.data?.status === 'completada' && canVoid ? (
@@ -241,6 +272,7 @@ export function SalesListPage() {
               rowKey="id"
               size="small"
               pagination={false}
+              scroll={{ x: 'max-content' }}
               dataSource={detail.data.details}
               columns={[
                 {

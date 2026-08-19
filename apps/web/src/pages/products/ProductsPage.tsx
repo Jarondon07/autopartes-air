@@ -21,12 +21,12 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
+import { DataTable } from '../../components/DataTable';
 import { PERMISSIONS, formatUsd } from '@autopartes-air/shared';
 import type { ProductRow } from '../../api/products.api';
 import { getApiErrorMessage } from '../../api/client';
@@ -258,12 +258,68 @@ export function ProductsPage() {
           </Col>
         </Row>
 
-        <Table<ProductRow>
+        <DataTable<ProductRow>
           rowKey="id"
           columns={columns}
           dataSource={products.data?.data ?? []}
           loading={products.isLoading}
           scroll={{ x: 1200 }}
+          mobileCard={(p) => ({
+            avatar: (
+              <Avatar
+                shape="square"
+                size={52}
+                src={p.primaryImageUrl ?? undefined}
+                icon={<PictureOutlined />}
+              />
+            ),
+            title: p.name,
+            subtitle: (
+              <>
+                <Text strong>{p.code}</Text>
+                {p.categoryId ? ` · ${categoryMap.get(p.categoryId) ?? '—'}` : ''}
+              </>
+            ),
+            tags: (
+              <>
+                <Tag color={p.stock <= p.minStock ? 'error' : 'default'}>
+                  Stock: {p.stock.toLocaleString('es-VE')}
+                  {p.stock <= p.minStock ? ' ⚠' : ''}
+                </Tag>
+                {p.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>}
+              </>
+            ),
+            fields: [
+              { label: 'Precio USD', value: <Text strong>{formatUsd(Number(p.priceUsd))}</Text> },
+              usdt > 0 && { label: 'Precio Bs', value: formatBs(Number(p.priceUsd) * usdt) },
+              usdt > 0 &&
+                bcv > 0 && {
+                  label: 'USD (BCV)',
+                  value: formatUsd((Number(p.priceUsd) * usdt) / bcv),
+                },
+            ],
+            actions: (
+              <>
+                <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewId(p.id)}>
+                  Ver
+                </Button>
+                {canUpdate && (
+                  <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(p.id)}>
+                    Editar
+                  </Button>
+                )}
+                {canUpdate && (
+                  <Button
+                    size="small"
+                    icon={p.isActive ? <StopOutlined /> : <CheckCircleOutlined />}
+                    onClick={() => toggleActive(p)}
+                  >
+                    {p.isActive ? 'Desactivar' : 'Activar'}
+                  </Button>
+                )}
+              </>
+            ),
+          })}
           pagination={{
             current: filters.page,
             pageSize: filters.limit,

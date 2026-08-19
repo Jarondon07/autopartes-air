@@ -13,6 +13,7 @@ import { getApiErrorMessage } from '../../api/client';
 import { useCurrentRates, useRates, useRefreshRates } from '../../hooks/useExchangeRates';
 import { useAuthStore } from '../../stores/auth.store';
 import { RateFormModal } from './RateFormModal';
+import { DataTable } from '../../components/DataTable';
 
 const { Title, Text } = Typography;
 
@@ -108,6 +109,9 @@ export function ExchangeRatesPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -165,11 +169,23 @@ export function ExchangeRatesPage() {
       </Row>
 
       <Card title="Historial" style={{ marginTop: 16 }}>
-        <Table<ExchangeRate>
+        <DataTable<ExchangeRate>
           rowKey="id"
           columns={columns}
           dataSource={rates.data?.data ?? []}
           loading={rates.isLoading}
+          mobileCard={(r) => ({
+            title: <Text strong>{formatRate(r.rateBsPerUsd)} Bs / USD</Text>,
+            subtitle: dayjs(r.rateDate).format('DD/MM/YYYY'),
+            tags: (
+              <>
+                <Tag color={SOURCE_COLOR[r.source] ?? 'default'}>
+                  {EXCHANGE_RATE_SOURCE_LABELS[r.source] ?? r.source}
+                </Tag>
+                {r.createdBy == null ? <Tag color="green">Automática</Tag> : <Tag>Manual</Tag>}
+              </>
+            ),
+          })}
           pagination={{
             current: page,
             pageSize: limit,

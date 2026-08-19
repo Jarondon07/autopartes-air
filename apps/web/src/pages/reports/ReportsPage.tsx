@@ -194,6 +194,7 @@ export function ReportsPage() {
           <Col xs={24} xl={14}>
             <Card title="Cuadre por método de pago">
               <Table<PaymentRow>
+              scroll={{ x: 'max-content' }}
                 rowKey="method"
                 size="small"
                 columns={paymentColumns}

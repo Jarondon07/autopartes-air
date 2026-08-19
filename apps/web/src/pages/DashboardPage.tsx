@@ -169,6 +169,7 @@ export function DashboardPage() {
         <Col xs={24} xl={16}>
           <Card title="Últimas ventas" style={{ minHeight: 320 }}>
             <Table<SaleRow>
+              scroll={{ x: 'max-content' }}
               rowKey="id"
               size="small"
               columns={salesColumns}

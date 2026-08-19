@@ -15,7 +15,6 @@ import {
   Modal,
   Space,
   Switch,
-  Table,
   Tag,
   Typography,
 } from 'antd';
@@ -31,6 +30,7 @@ import {
   useUpdateTax,
 } from '../../hooks/useTaxes';
 import { useAuthStore } from '../../stores/auth.store';
+import { DataTable } from '../../components/DataTable';
 
 const { Title, Text } = Typography;
 
@@ -195,7 +195,16 @@ export function TaxesPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
         <div>
           <Title level={3} style={{ margin: 0 }}>
             <strong>Impuestos</strong>
@@ -212,12 +221,46 @@ export function TaxesPage() {
       </div>
 
       <Card>
-        <Table<Tax>
+        <DataTable<Tax>
           rowKey="id"
           columns={columns}
           dataSource={taxes.data ?? []}
           loading={taxes.isLoading}
           pagination={false}
+          mobileCard={(t) => ({
+            title: t.name,
+            subtitle: `${Number(t.rate)}%`,
+            tags: t.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>,
+            actions: canManage ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setEditing(t);
+                    setModalOpen(true);
+                  }}
+                >
+                  Editar
+                </Button>
+                <Button
+                  size="small"
+                  icon={t.isActive ? <StopOutlined /> : <CheckCircleOutlined />}
+                  onClick={() => toggle(t)}
+                >
+                  {t.isActive ? 'Desactivar' : 'Activar'}
+                </Button>
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => confirmDelete(t)}
+                >
+                  Eliminar
+                </Button>
+              </>
+            ) : null,
+          })}
         />
       </Card>
 

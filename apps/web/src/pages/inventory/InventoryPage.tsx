@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, Card, Select, Space, Table, Tag, Typography } from 'antd';
+import { Button, Card, Select, Space, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import {
@@ -10,6 +10,7 @@ import {
   type MovementType,
 } from '@autopartes-air/shared';
 import type { MovementRow } from '../../api/inventory.api';
+import { DataTable } from '../../components/DataTable';
 import { useMovements } from '../../hooks/useInventory';
 import { useAuthStore } from '../../stores/auth.store';
 import { AdjustmentModal } from './AdjustmentModal';
@@ -89,6 +90,9 @@ export function InventoryPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -123,11 +127,32 @@ export function InventoryPage() {
           />
         </Space>
 
-        <Table<MovementRow>
+        <DataTable<MovementRow>
           rowKey="id"
           columns={columns}
           dataSource={movements.data?.data ?? []}
           loading={movements.isLoading}
+          mobileCard={(m) => ({
+            title: (
+              <span>
+                <Text strong>{m.productCode}</Text> — {m.productName}
+              </span>
+            ),
+            subtitle: dayjs(m.createdAt).format('DD/MM/YYYY HH:mm'),
+            tags: <Tag color={TYPE_COLOR[m.movementType]}>{MOVEMENT_TYPE_LABELS[m.movementType]}</Tag>,
+            fields: [
+              {
+                label: 'Cantidad',
+                value: (
+                  <Text strong style={{ color: m.quantity >= 0 ? '#52c41a' : '#dc3545' }}>
+                    {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
+                  </Text>
+                ),
+              },
+              { label: 'Stock resultante', value: m.stockAfter },
+              m.notes ? { label: 'Nota', value: m.notes } : null,
+            ],
+          })}
           pagination={{
             current: page,
             pageSize: limit,

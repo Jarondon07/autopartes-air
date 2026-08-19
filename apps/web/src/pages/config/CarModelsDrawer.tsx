@@ -9,6 +9,7 @@ import { App, Button, Drawer, Input, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table';
 import type { CarBrand, CarModel } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
+import { DataTable } from '../../components/DataTable';
 import {
   useCarModels,
   useCreateCarModel,
@@ -161,13 +162,34 @@ export function CarModelsDrawer({ brand, onClose }: Props) {
         </Button>
       </Space.Compact>
 
-      <Table<CarModel>
+      <DataTable<CarModel>
         rowKey="id"
         size="small"
         columns={columns}
         dataSource={models.data ?? []}
         loading={models.isLoading}
         pagination={false}
+        mobileCard={(m) => ({
+          title: m.name,
+          tags: m.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>,
+          actions: (
+            <>
+              <Button size="small" icon={<EditOutlined />} onClick={() => rename(m)}>
+                Renombrar
+              </Button>
+              <Button
+                size="small"
+                icon={m.isActive ? <StopOutlined /> : <CheckCircleOutlined />}
+                onClick={() => toggle(m)}
+              >
+                {m.isActive ? 'Desactivar' : 'Activar'}
+              </Button>
+              <Button size="small" danger icon={<DeleteOutlined />} onClick={() => confirmDelete(m)}>
+                Eliminar
+              </Button>
+            </>
+          ),
+        })}
         locale={{ emptyText: 'Sin modelos aún' }}
       />
     </Drawer>

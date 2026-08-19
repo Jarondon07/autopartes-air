@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
 import { useUiStore } from '../../stores/ui.store';
 import { useLogout } from '../../hooks/useAuth';
+import { useIsMobile } from '../../hooks/useResponsive';
 import { COLORS } from '../../theme/tokens';
 
 const { Header } = Layout;
@@ -25,9 +26,15 @@ function initials(name?: string): string {
 
 export function Topbar() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
+  const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
   const user = useAuthStore((s) => s.user);
   const logout = useLogout();
+
+  // En móvil el botón abre el Drawer; en escritorio colapsa el sidebar.
+  const onMenuClick = () => (isMobile ? setMobileNavOpen(!mobileNavOpen) : toggleSidebar());
 
   const itemStyle: React.CSSProperties = {
     display: 'flex',
@@ -43,6 +50,7 @@ export function Topbar() {
     <div
       style={{
         width: 240,
+        maxWidth: 'calc(100vw - 24px)',
         background: '#fff',
         borderRadius: 8,
         boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
@@ -92,7 +100,7 @@ export function Topbar() {
     <Header
       style={{
         background: COLORS.navbarBg,
-        padding: '0 24px',
+        padding: isMobile ? '0 12px' : '0 24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -105,8 +113,9 @@ export function Topbar() {
       <Button
         type="text"
         icon={<MenuOutlined />}
-        onClick={toggleSidebar}
+        onClick={onMenuClick}
         aria-label="Alternar menú"
+        style={{ width: 40, height: 40 }}
       />
 
       <Dropdown
@@ -130,7 +139,7 @@ export function Topbar() {
         >
           <span
             style={{
-              display: 'flex',
+              display: isMobile ? 'none' : 'flex',
               flexDirection: 'column',
               alignItems: 'flex-end',
               justifyContent: 'center',
@@ -147,10 +156,10 @@ export function Topbar() {
               {user?.roleName ?? ''}
             </Text>
           </span>
-          <Avatar size={38} style={{ background: COLORS.primary, fontWeight: 600 }}>
+          <Avatar size={isMobile ? 34 : 38} style={{ background: COLORS.primary, fontWeight: 600 }}>
             {initials(user?.fullName)}
           </Avatar>
-          <DownOutlined style={{ fontSize: 10, color: '#adb5bd' }} />
+          {!isMobile && <DownOutlined style={{ fontSize: 10, color: '#adb5bd' }} />}
         </div>
       </Dropdown>
     </Header>

@@ -15,7 +15,6 @@ import {
   Modal,
   Space,
   Switch,
-  Table,
   Tag,
   Typography,
 } from 'antd';
@@ -30,6 +29,7 @@ import {
   useWarehouses,
 } from '../../hooks/useWarehouses';
 import { useAuthStore } from '../../stores/auth.store';
+import { DataTable } from '../../components/DataTable';
 
 const { Title, Text } = Typography;
 
@@ -200,6 +200,9 @@ export function WarehousesPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -224,12 +227,45 @@ export function WarehousesPage() {
       </div>
 
       <Card>
-        <Table<Warehouse>
+        <DataTable<Warehouse>
           rowKey="id"
           columns={columns}
           dataSource={warehouses.data ?? []}
           loading={warehouses.isLoading}
           pagination={false}
+          mobileCard={(w) => ({
+            title: w.name,
+            tags: w.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>,
+            actions: canManage ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setEditing(w);
+                    setModalOpen(true);
+                  }}
+                >
+                  Editar
+                </Button>
+                <Button
+                  size="small"
+                  icon={w.isActive ? <StopOutlined /> : <CheckCircleOutlined />}
+                  onClick={() => toggle(w)}
+                >
+                  {w.isActive ? 'Desactivar' : 'Activar'}
+                </Button>
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => confirmDelete(w)}
+                >
+                  Eliminar
+                </Button>
+              </>
+            ) : null,
+          })}
         />
       </Card>
 

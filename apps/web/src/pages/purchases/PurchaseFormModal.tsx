@@ -278,6 +278,7 @@ export function PurchaseFormModal({ open, onClose }: Props) {
       />
 
       <Table<Item>
+              scroll={{ x: 'max-content' }}
         rowKey={(it) => it.product.id}
         columns={columns}
         dataSource={items}

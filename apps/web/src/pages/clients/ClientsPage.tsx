@@ -6,7 +6,6 @@ import {
   Card,
   Input,
   Space,
-  Table,
   Tag,
   Typography,
 } from 'antd';
@@ -14,6 +13,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { Client } from '@autopartes-air/shared';
 import { PERMISSIONS } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
+import { DataTable } from '../../components/DataTable';
 import {
   useClients,
   useDeleteClient,
@@ -128,6 +128,9 @@ export function ClientsPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -152,11 +155,43 @@ export function ClientsPage() {
           onSearch={(q) => setFilters((f) => ({ ...f, q: q || undefined, page: 1 }))}
         />
 
-        <Table<Client>
+        <DataTable<Client>
           rowKey="id"
           columns={columns}
           dataSource={clients.data?.data ?? []}
           loading={clients.isLoading}
+          mobileCard={(c) => ({
+            title: c.name,
+            subtitle: (
+              <>
+                <Tag>{c.documentType}</Tag>
+                {c.documentNumber}
+              </>
+            ),
+            fields: [
+              { label: 'Telefono', value: c.phone || <Text type="secondary">—</Text> },
+              { label: 'Correo', value: c.email || <Text type="secondary">—</Text> },
+            ],
+            actions: (
+              <>
+                {canUpdate && (
+                  <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(c)}>
+                    Editar
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => confirmDelete(c)}
+                  >
+                    Eliminar
+                  </Button>
+                )}
+              </>
+            ),
+          })}
           pagination={{
             current: filters.page,
             pageSize: filters.limit,

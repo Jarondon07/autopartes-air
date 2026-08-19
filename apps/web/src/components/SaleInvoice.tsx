@@ -51,6 +51,7 @@ export function SaleInvoice({ sale }: { sale: SaleDetail }) {
       </Descriptions>
 
       <Table
+              scroll={{ x: 'max-content' }}
         rowKey="id"
         size="small"
         pagination={false}

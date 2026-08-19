@@ -12,7 +12,6 @@ import {
   Form,
   Input,
   Space,
-  Table,
   Tag,
   Typography,
 } from 'antd';
@@ -27,6 +26,7 @@ import {
 } from '../../hooks/useUsers';
 import { useAuthStore } from '../../stores/auth.store';
 import { UserFormModal } from './UserFormModal';
+import { DataTable } from '../../components/DataTable';
 
 const { Title, Text } = Typography;
 
@@ -179,6 +179,9 @@ export function UsersPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -196,11 +199,50 @@ export function UsersPage() {
       </div>
 
       <Card>
-        <Table<User>
+        <DataTable<User>
           rowKey="id"
           columns={columns}
           dataSource={users.data?.data ?? []}
           loading={users.isLoading}
+          mobileCard={(u) => ({
+            title: (
+              <span>
+                {u.username}
+                {u.id === currentUser?.id && (
+                  <Tag color="blue" style={{ marginLeft: 8 }}>
+                    tú
+                  </Tag>
+                )}
+              </span>
+            ),
+            subtitle: u.fullName,
+            tags: (
+              <>
+                <Tag style={{ textTransform: 'capitalize' }}>{u.roleName}</Tag>
+                {u.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>}
+              </>
+            ),
+            actions: (
+              <>
+                <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(u)}>
+                  Editar
+                </Button>
+                <Button size="small" icon={<KeyOutlined />} onClick={() => openReset(u)}>
+                  Contraseña
+                </Button>
+                {u.id !== currentUser?.id && (
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => confirmDelete(u)}
+                  >
+                    Eliminar
+                  </Button>
+                )}
+              </>
+            ),
+          })}
           pagination={{
             current: page,
             pageSize: limit,

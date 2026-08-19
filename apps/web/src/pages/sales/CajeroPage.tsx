@@ -39,6 +39,8 @@ import { listProducts, type ProductRow } from '../../api/products.api';
 import { MoneyInput, QuantityInput } from '../../components/NumberInputs';
 import { ClientPicker } from './ClientPicker';
 import { ProductPreview } from '../../components/ProductPreview';
+import { DataTable } from '../../components/DataTable';
+import { useIsMobile } from '../../hooks/useResponsive';
 import { SaleInvoice } from '../../components/SaleInvoice';
 import type { SaleDetail } from '../../api/sales.api';
 import { useProducts } from '../../hooks/useProducts';
@@ -61,6 +63,7 @@ function formatBs(n: number): string {
 
 export function CajeroPage() {
   const { message, modal } = App.useApp();
+  const isMobile = useIsMobile();
   const createSale = useCreateSale();
   const searchRef = useRef<InputRef>(null);
 
@@ -433,7 +436,7 @@ export function CajeroPage() {
                     border: '1px solid #f0f0f0',
                     borderRadius: 8,
                     boxShadow: '0 6px 16px rgba(0, 0, 0, 0.12)',
-                    maxHeight: 400,
+                    maxHeight: isMobile ? '60vh' : 400,
                     overflowY: 'auto',
                   }}
                 >
@@ -458,9 +461,12 @@ export function CajeroPage() {
                           key={p.id}
                           style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            padding: '8px 12px',
+                            // En telefono la fila se apila: los datos arriba y la
+                            // cantidad + "Agregar" debajo, con espacio para el pulgar.
+                            flexWrap: isMobile ? 'wrap' : 'nowrap',
+                            alignItems: isMobile ? 'flex-start' : 'center',
+                            gap: isMobile ? 8 : 12,
+                            padding: isMobile ? '10px 12px' : '8px 12px',
                             borderBottom: '1px solid #f5f5f5',
                           }}
                         >
@@ -493,7 +499,13 @@ export function CajeroPage() {
                               </Tag>
                             </Space>
                           </div>
-                          <div style={{ width: 84, flexShrink: 0 }}>
+                          <div
+                            style={{
+                              width: isMobile ? 96 : 84,
+                              flexShrink: 0,
+                              marginLeft: isMobile ? 56 : 0,
+                            }}
+                          >
                             <QuantityInput
                               min={1}
                               max={stock}
@@ -510,7 +522,7 @@ export function CajeroPage() {
                             onClick={() => addFromResult(p)}
                             disabled={noStock}
                             title={noStock ? 'Sin stock disponible' : undefined}
-                            style={{ flexShrink: 0 }}
+                            style={{ flexShrink: 0, flex: isMobile ? 1 : undefined }}
                           >
                             Agregar
                           </Button>
@@ -522,7 +534,7 @@ export function CajeroPage() {
               )}
             </div>
 
-            <Table<CartItem>
+            <DataTable<CartItem>
               rowKey={(it) => it.product.id}
               columns={columns}
               dataSource={cart}
@@ -530,6 +542,52 @@ export function CajeroPage() {
               size="small"
               scroll={{ x: 760 }}
               locale={{ emptyText: 'Escanea o busca productos para agregar' }}
+              mobileCard={(it) => ({
+                title: (
+                  <Link onClick={() => setDetailId(it.product.id)}>
+                    <Text strong>{it.product.code}</Text> — {it.product.name}
+                  </Link>
+                ),
+                subtitle: `stock: ${it.product.stock}`,
+                fields: [
+                  {
+                    label: 'Cantidad',
+                    value: (
+                      <div style={{ width: 110, marginLeft: 'auto' }}>
+                        <QuantityInput
+                          min={1}
+                          max={it.product.stock}
+                          value={it.quantity}
+                          onChange={(v) => {
+                            const n = Math.min(Math.max(Number(v) || 1, 1), it.product.stock);
+                            if (Number(v) > it.product.stock) {
+                              message.warning(
+                                `Solo hay ${it.product.stock} en stock de "${it.product.name}"`,
+                              );
+                            }
+                            updateItem(it.product.id, { quantity: n });
+                          }}
+                        />
+                      </div>
+                    ),
+                  },
+                  { label: 'Precio unit.', value: moneyCell(it.unitPriceUsd) },
+                  {
+                    label: 'Subtotal',
+                    value: moneyCell(round2(it.unitPriceUsd * it.quantity)),
+                  },
+                ],
+                actions: (
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => removeItem(it.product.id)}
+                  >
+                    Quitar
+                  </Button>
+                ),
+              })}
             />
           </Card>
 

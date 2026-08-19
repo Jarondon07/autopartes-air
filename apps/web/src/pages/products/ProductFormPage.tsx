@@ -27,6 +27,7 @@ import { categoryOptions } from '../../lib/categories';
 import { useBrands, useCategories } from '../../hooks/useCatalogs';
 import { useCarBrands, useCarModels } from '../../hooks/useCarBrands';
 import { useWarehouses } from '../../hooks/useWarehouses';
+import { useIsMobile } from '../../hooks/useResponsive';
 import {
   useCreateProduct,
   useProduct,
@@ -83,6 +84,7 @@ const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR + 1 - 1990 + 1 }, (_, i) 
 });
 
 export function ProductFormPage() {
+  const isMobile = useIsMobile();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [form] = Form.useForm<FormValues>();
@@ -229,7 +231,7 @@ export function ProductFormPage() {
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto' }}>
-      <Space align="center" style={{ marginBottom: 16 }}>
+      <Space align="center" wrap style={{ marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/productos')} />
         <Title level={3} style={{ margin: 0 }}>
           <strong>{isEdit ? 'Editar producto' : 'Nuevo producto'}</strong>
@@ -494,9 +496,15 @@ export function ProductFormPage() {
           </Card>
         )}
 
-        <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
-          <Button onClick={() => navigate('/productos')}>Cancelar</Button>
-          <Button type="primary" loading={submitting} onClick={onSubmit}>
+        <Space
+          style={{ justifyContent: 'flex-end', width: '100%' }}
+          direction={isMobile ? 'vertical' : 'horizontal'}
+          styles={{ item: { width: isMobile ? '100%' : 'auto' } }}
+        >
+          <Button block={isMobile} onClick={() => navigate('/productos')}>
+            Cancelar
+          </Button>
+          <Button block={isMobile} type="primary" loading={submitting} onClick={onSubmit}>
             Guardar
           </Button>
         </Space>

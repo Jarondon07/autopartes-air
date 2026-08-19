@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
-import { App, Button, Card, Input, Space, Table, Typography } from 'antd';
+import { App, Button, Card, Input, Space, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { Supplier } from '@autopartes-air/shared';
 import { PERMISSIONS } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
+import { DataTable } from '../../components/DataTable';
 import { useDeleteSupplier, useSuppliers } from '../../hooks/useSuppliers';
 import { useAuthStore } from '../../stores/auth.store';
 import { SupplierFormModal } from './SupplierFormModal';
@@ -106,6 +107,9 @@ export function SuppliersPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          // En telefono el titulo y las acciones se apilan en vez de aplastarse.
+          flexWrap: 'wrap',
+          gap: 12,
           marginBottom: 16,
         }}
       >
@@ -130,11 +134,38 @@ export function SuppliersPage() {
           onSearch={(q) => setFilters((f) => ({ ...f, q: q || undefined, page: 1 }))}
         />
 
-        <Table<Supplier>
+        <DataTable<Supplier>
           rowKey="id"
           columns={columns}
           dataSource={suppliers.data?.data ?? []}
           loading={suppliers.isLoading}
+          mobileCard={(sp) => ({
+            title: sp.name,
+            subtitle: <Text strong>{sp.rif}</Text>,
+            fields: [
+              { label: 'Contacto', value: sp.contactName || <Text type="secondary">—</Text> },
+              { label: 'Telefono', value: sp.phone || <Text type="secondary">—</Text> },
+            ],
+            actions: (
+              <>
+                {canUpdate && (
+                  <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(sp)}>
+                    Editar
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => confirmDelete(sp)}
+                  >
+                    Eliminar
+                  </Button>
+                )}
+              </>
+            ),
+          })}
           pagination={{
             current: filters.page,
             pageSize: filters.limit,
