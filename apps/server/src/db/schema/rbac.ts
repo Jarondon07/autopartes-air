@@ -43,6 +43,8 @@ export const users = pgTable('users', {
     .notNull()
     .references(() => roles.id),
   isActive: boolean('is_active').notNull().default(true),
+  /** Fuerza el cambio de contraseña en el próximo inicio de sesión. */
+  mustChangePassword: boolean('must_change_password').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

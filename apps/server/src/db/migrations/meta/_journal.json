@@ -148,6 +148,13 @@
       "when": 1786624451909,
       "tag": "0020_fresh_betty_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787103233782,
+      "tag": "0021_faithful_silver_fox",
+      "breakpoints": true
     }
   ]
 }

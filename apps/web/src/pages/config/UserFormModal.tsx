@@ -100,7 +100,8 @@ export function UserFormModal({ open, user, onClose }: Props) {
         {!isEdit && (
           <Form.Item
             name="password"
-            label="Contraseña"
+            label="Contraseña provisional"
+            extra="El usuario deberá cambiarla la primera vez que inicie sesión."
             rules={[
               { required: true, message: 'Ingresa la contraseña' },
               { min: 6, message: 'Mínimo 6 caracteres' },

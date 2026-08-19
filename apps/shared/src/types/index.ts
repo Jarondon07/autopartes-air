@@ -47,6 +47,12 @@ export interface User {
   roleId: number;
   roleName: RoleName;
   isActive: boolean;
+  /**
+   * El usuario debe cambiar su contraseña antes de poder usar el sistema.
+   * Se activa al crear el usuario y al resetearle la contraseña desde
+   * Configuración; se apaga cuando el propio usuario la cambia.
+   */
+  mustChangePassword: boolean;
   createdAt: string;
 }
 

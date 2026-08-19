@@ -80,7 +80,10 @@ export function UsersPage() {
       icon: <KeyOutlined />,
       content: (
         <Form layout="vertical" style={{ marginTop: 12 }}>
-          <Form.Item label="Contraseña (mín. 6 caracteres)">
+          <Form.Item
+            label="Contraseña (mín. 6 caracteres)"
+            extra="Es provisional: el usuario deberá definir la suya al iniciar sesión."
+          >
             <Input.Password
               onChange={(e) => {
                 password = e.target.value;
@@ -134,10 +137,18 @@ export function UsersPage() {
     },
     {
       title: 'Estado',
-      dataIndex: 'isActive',
-      width: 110,
-      render: (active: boolean) =>
-        active ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>,
+      key: 'estado',
+      width: 190,
+      render: (_, u) => (
+        <Space size={4} wrap>
+          {u.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>}
+          {u.mustChangePassword && (
+            <Tag color="warning" title="Debe definir su contraseña al entrar">
+              Clave provisional
+            </Tag>
+          )}
+        </Space>
+      ),
     },
     {
       title: '',
@@ -220,6 +231,7 @@ export function UsersPage() {
               <>
                 <Tag style={{ textTransform: 'capitalize' }}>{u.roleName}</Tag>
                 {u.isActive ? <Tag color="success">Activo</Tag> : <Tag>Inactivo</Tag>}
+                {u.mustChangePassword && <Tag color="warning">Clave provisional</Tag>}
               </>
             ),
             actions: (

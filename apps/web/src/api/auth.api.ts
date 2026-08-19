@@ -37,7 +37,13 @@ export async function updateProfile(input: UpdateProfileInput): Promise<AuthUser
   return data.data;
 }
 
-/** POST /auth/change-password — cambia la contraseña propia. */
-export async function changePassword(input: ChangePasswordInput): Promise<void> {
-  await api.post('/auth/change-password', input);
+/**
+ * POST /auth/change-password — cambia la contraseña propia.
+ *
+ * Devuelve una sesión nueva: el token anterior lleva dentro el flag
+ * `mustChangePassword`, así que hay que reemplazarlo para quedar desbloqueado.
+ */
+export async function changePassword(input: ChangePasswordInput): Promise<LoginResponse> {
+  const { data } = await api.post<ApiSuccess<LoginResponse>>('/auth/change-password', input);
+  return data.data;
 }

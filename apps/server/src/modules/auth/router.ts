@@ -5,7 +5,7 @@ import {
   updateProfileSchema,
 } from '@autopartes-air/shared';
 import { cookieSecure } from '../../infra/env';
-import { requireAuth } from '../../middleware/auth';
+import { requireAuth, requireAuthAllowPasswordChange } from '../../middleware/auth';
 import { unauthorized } from '../../middleware/error';
 import { validate } from '../../middleware/validate';
 import * as authService from './service';
@@ -59,7 +59,9 @@ authRouter.post('/logout', (_req, res) => {
   res.json({ success: true, data: null });
 });
 
-authRouter.get('/me', requireAuth, async (req, res, next) => {
+// Accesible con contraseña provisional: el frontend necesita identificar al
+// usuario para mostrarle la pantalla de cambio obligatorio.
+authRouter.get('/me', requireAuthAllowPasswordChange, async (req, res, next) => {
   try {
     const user = await authService.me(req.user!.sub);
     res.json({ success: true, data: user });
@@ -82,15 +84,22 @@ authRouter.patch(
   },
 );
 
+// La ruta que desbloquea: por definición se usa con la contraseña provisional.
+// Devuelve sesión nueva porque el token viejo lleva el flag encendido.
 authRouter.post(
   '/change-password',
-  requireAuth,
+  requireAuthAllowPasswordChange,
   validate(changePasswordSchema),
   async (req, res, next) => {
     try {
       const { currentPassword, newPassword } = req.body;
-      await authService.changePassword(req.user!.sub, currentPassword, newPassword);
-      res.json({ success: true, data: null });
+      const { user, accessToken, refreshToken } = await authService.changePassword(
+        req.user!.sub,
+        currentPassword,
+        newPassword,
+      );
+      setRefreshCookie(res, refreshToken);
+      res.json({ success: true, data: { user, accessToken } });
     } catch (err) {
       next(err);
     }

@@ -11,6 +11,8 @@ interface AuthState {
   setAccessToken: (accessToken: string) => void;
   /** Actualiza solo el usuario en memoria (ej. tras editar el perfil). */
   setUser: (user: AuthUser) => void;
+  /** Marca la sesión como "debe cambiar contraseña" (ver interceptor de Axios). */
+  markMustChangePassword: () => void;
   clear: () => void;
   hasPermission: (permission: PermissionCode) => boolean;
 }
@@ -32,6 +34,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setAccessToken: (accessToken) => set({ accessToken }),
 
   setUser: (user) => set({ user }),
+
+  markMustChangePassword: () =>
+    set((s) => (s.user ? { user: { ...s.user, mustChangePassword: true } } : {})),
 
   clear: () => set({ accessToken: null, user: null, isAuthenticated: false }),
 

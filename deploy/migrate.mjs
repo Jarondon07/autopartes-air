@@ -13,10 +13,13 @@ import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-config({ path: '.env' });
+// Misma convención que `apps/server/src/infra/env.ts`:
+//   producción -> .env   ·   desarrollo -> .env.local
+const envFile = (process.env.NODE_ENV ?? 'development') === 'production' ? '.env' : '.env.local';
+config({ path: envFile });
 
 if (!process.env.DATABASE_URL) {
-  console.error('❌ DATABASE_URL no definida (¿estás corriendo esto desde apps/server?)');
+  console.error(`❌ DATABASE_URL no definida en ${envFile} (¿corriendo desde apps/server?)`);
   process.exit(1);
 }
 

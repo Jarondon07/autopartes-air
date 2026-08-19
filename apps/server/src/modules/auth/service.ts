@@ -32,6 +32,7 @@ async function getAuthUser(userId: number): Promise<AuthUser> {
       roleId: users.roleId,
       roleName: roles.name,
       isActive: users.isActive,
+      mustChangePassword: users.mustChangePassword,
       createdAt: users.createdAt,
     })
     .from(users)
@@ -55,6 +56,7 @@ function signAccessToken(user: AuthUser): string {
     username: user.username,
     role: user.roleName,
     permissions: user.permissions,
+    mustChangePassword: user.mustChangePassword,
   };
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, {
     expiresIn: env.JWT_ACCESS_TTL as SignOptions['expiresIn'],
@@ -114,21 +116,39 @@ export async function updateProfile(userId: number, fullName: string): Promise<A
   return getAuthUser(userId);
 }
 
-/** Cambia la contraseña propia, validando la contraseña actual. */
+/**
+ * Cambia la contraseña propia, validando la contraseña actual.
+ *
+ * Devuelve una sesión nueva: al cambiarla se apaga `mustChangePassword`, y el
+ * token anterior todavía lleva el flag encendido (viaja dentro del JWT). Sin
+ * tokens frescos el usuario seguiría bloqueado hasta que expirara el access
+ * token, hasta 15 minutos.
+ */
 export async function changePassword(
   userId: number,
   currentPassword: string,
   newPassword: string,
-): Promise<void> {
+) {
   const [row] = await db.select().from(users).where(eq(users.id, userId));
   if (!row) throw unauthorized('Usuario inexistente');
 
   const ok = await bcrypt.compare(currentPassword, row.passwordHash);
   if (!ok) throw badRequest('La contraseña actual es incorrecta');
 
+  if (currentPassword === newPassword) {
+    throw badRequest('La contraseña nueva debe ser distinta de la actual');
+  }
+
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await db
     .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
+    .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })
     .where(eq(users.id, userId));
+
+  const user = await getAuthUser(userId);
+  return {
+    user,
+    accessToken: signAccessToken(user),
+    refreshToken: signRefreshToken(user.id),
+  };
 }

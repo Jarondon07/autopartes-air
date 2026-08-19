@@ -18,6 +18,7 @@ const publicCols = {
   roleId: users.roleId,
   roleName: roles.name,
   isActive: users.isActive,
+  mustChangePassword: users.mustChangePassword,
   createdAt: users.createdAt,
 };
 
@@ -86,6 +87,9 @@ export async function create(input: CreateUserInput) {
           passwordHash,
           fullName: input.fullName,
           roleId: input.roleId,
+          // La contraseña que fija el administrador es provisional: el usuario
+          // debe cambiarla en su primer inicio de sesión.
+          mustChangePassword: true,
         })
         .returning({ id: users.id });
       return getById(row!.id);
@@ -110,11 +114,12 @@ export async function update(id: number, input: UpdateUserInput) {
   });
 }
 
+/** Reset por un administrador: la contraseña queda provisional. */
 export async function resetPassword(id: number, password: string) {
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const [row] = await db
     .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
+    .set({ passwordHash, mustChangePassword: true, updatedAt: new Date() })
     .where(eq(users.id, id))
     .returning({ id: users.id });
   if (!row) throw notFound('Usuario no encontrado');

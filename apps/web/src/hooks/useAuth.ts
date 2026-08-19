@@ -36,10 +36,15 @@ export function useUpdateProfile() {
   });
 }
 
-/** Cambia la contraseña propia. */
+/**
+ * Cambia la contraseña propia y guarda la sesión nueva que devuelve el
+ * servidor. Es lo que levanta el bloqueo de contraseña provisional.
+ */
 export function useChangePassword() {
+  const setSession = useAuthStore((s) => s.setSession);
   return useMutation({
     mutationFn: (input: ChangePasswordInput) => authApi.changePassword(input),
+    onSuccess: ({ accessToken, user }) => setSession(accessToken, user),
   });
 }
 

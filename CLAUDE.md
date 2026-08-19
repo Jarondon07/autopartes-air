@@ -109,6 +109,7 @@ El usuario trabaja en **Windows 10** con **PowerShell y Git Bash**. Da los coman
 
 ### Auth / RBAC
 - JWT: access 15 min (header `Authorization: Bearer`) + refresh 7 días (cookie httpOnly en `/api/v1/auth`).
+- **Cambio obligatorio de contraseña:** `users.mustChangePassword` se enciende al **crear** un usuario y al **resetearle** la contraseña desde Configuración (la que fija el administrador es provisional), y se apaga cuando el propio usuario la cambia. El flag viaja **dentro del access token**: `requireAuth` responde **403 `PASSWORD_CHANGE_REQUIRED`** en toda ruta protegida mientras esté encendido; solo `GET /auth/me` y `POST /auth/change-password` usan `requireAuthAllowPasswordChange`. Por eso `change-password` devuelve **sesión nueva** (token + cookie): con el token viejo el usuario seguiría bloqueado hasta 15 min. En la web lo aplica `ProtectedRoute`, que renderiza `ForcePasswordChangePage` en lugar del layout sin cambiar la URL. El seed marca `root` y `admin` así (su clave está publicada en este archivo).
 - Permisos definidos en `shared/src/constants/roles.ts`. La autoridad real es el middleware del servidor; el frontend solo oculta UI.
 
 ## Estado del desarrollo

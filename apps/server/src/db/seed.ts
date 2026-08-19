@@ -106,6 +106,9 @@ async function seed() {
       passwordHash: await bcrypt.hash(u.password, 10),
       fullName: u.fullName,
       roleId: roleIdByName.get(u.role)!,
+      // `Clave123*` está publicada en la documentación del repo: es provisional
+      // y el sistema obliga a cambiarla en el primer inicio de sesión.
+      mustChangePassword: true,
     });
     console.log(`  👤 Usuario creado: ${u.username} / ${u.password}`);
   }
