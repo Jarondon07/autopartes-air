@@ -104,10 +104,20 @@ body {
 }
 
 /* El Drawer del menú móvil reutiliza los estilos del sidebar (borde azul del
-   item activo), pero no debe heredar el ancho fijo del Sider. */
+   item activo). El scroll lo maneja el cuerpo del Drawer: darle además altura
+   fija y overflow al propio Menu creaba un segundo contenedor con scroll, y al
+   abrir un submenú los items de abajo quedaban fuera de alcance. */
+.app-sidebar-drawer .ant-drawer-body {
+  display: flex;
+  flex-direction: column;
+}
+.app-sidebar-drawer .app-brand {
+  flex-shrink: 0;
+}
 .app-sidebar-drawer .ant-menu {
-  height: calc(100vh - 56px);
-  overflow-y: auto;
+  flex: 1;
+  /* Aire al final para que el último item no quede pegado al borde inferior. */
+  padding-bottom: 24px;
 }
 
 @media (max-width: 767px) {

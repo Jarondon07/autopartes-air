@@ -28,6 +28,7 @@ function matchLeafKey(pathname: string): string | undefined {
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
     <div
+      className="app-brand"
       style={{
         height: LAYOUT.headerHeight,
         display: 'flex',
@@ -141,7 +142,7 @@ export function Sidebar() {
         width={Math.min(LAYOUT.sidebarWidth + 20, 300)}
         closable={false}
         styles={{ body: { padding: 0, background: COLORS.sidebarBg } }}
-        className="app-sidebar app-sidebar-drawer"
+        rootClassName="app-sidebar app-sidebar-drawer"
       >
         <Brand collapsed={false} />
         {menu}
