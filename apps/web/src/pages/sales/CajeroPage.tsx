@@ -13,6 +13,7 @@ import {
   Card,
   Checkbox,
   Col,
+  DatePicker,
   Divider,
   Empty,
   Input,
@@ -25,6 +26,7 @@ import {
   Typography,
 } from 'antd';
 import type { InputRef } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
 import type { PaymentMethod, Product } from '@autopartes-air/shared';
 import {
@@ -48,6 +50,7 @@ import { useWarehouses } from '../../hooks/useWarehouses';
 import { useCurrentRates } from '../../hooks/useExchangeRates';
 import { useAppliedTaxRate } from '../../hooks/useTaxes';
 import { useCreateSale } from '../../hooks/useSales';
+import { formatDate } from '../../lib/datetime';
 
 const { Title, Text, Link } = Typography;
 
@@ -71,6 +74,9 @@ export function CajeroPage() {
   const [query, setQuery] = useState('');
   const [resultQty, setResultQty] = useState<Record<number, number>>({});
   const [clientId, setClientId] = useState<number | undefined>();
+  /** Venta a crédito: lo que no se abone ahora queda como deuda del cliente. */
+  const [isCredit, setIsCredit] = useState(false);
+  const [dueDate, setDueDate] = useState<Dayjs | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
   const [paymentError, setPaymentError] = useState(false);
@@ -103,15 +109,6 @@ export function CajeroPage() {
   const totalBs = usdt > 0 ? round2(totalUsd * usdt) : 0; // referencia: total si todo se paga en Bs
   const totalUsdBcv = usdt > 0 && bcv > 0 ? round2(totalBs / bcv) : totalUsd;
 
-  // Texto del botón Cobrar: con 1 método muestra el monto (USD o USD-BCV); con varios solo "Cobrar".
-  const soloMetodo = paymentMethods.length === 1 ? paymentMethods[0] : undefined;
-  const cobrarLabel =
-    soloMetodo == null
-      ? 'Cobrar'
-      : PAYMENT_METHOD_CURRENCY[soloMetodo] === 'BS'
-        ? `Cobrar ${formatUsd(totalUsdBcv)} (BCV)`
-        : `Cobrar ${formatUsd(totalUsd)}`;
-
   // Desglose de pago: USD primero (editables), Bs al final (auto = resto). El último es el resto.
   const orderedMethods = useMemo(
     () =>
@@ -122,8 +119,11 @@ export function CajeroPage() {
       ),
     [paymentMethods],
   );
-  const lastMethod = orderedMethods[orderedMethods.length - 1];
-  const editableMethods = orderedMethods.slice(0, -1); // todos llevan input menos el último (resto)
+  // De contado, el último método absorbe el resto del total. A crédito no hay
+  // "resto" que repartir: lo que se ingresa es el abono inicial, así que todos
+  // los métodos llevan su monto explícito.
+  const lastMethod = isCredit ? undefined : orderedMethods[orderedMethods.length - 1];
+  const editableMethods = isCredit ? orderedMethods : orderedMethods.slice(0, -1);
   const firstBsIndex = orderedMethods.findIndex((m) => PAYMENT_METHOD_CURRENCY[m] === 'BS');
 
   /** El monto ingresado se guarda en la moneda del método (USD o Bs). USD cubierto por el método: */
@@ -133,14 +133,35 @@ export function CajeroPage() {
   };
   const sumEditableUsd = round2(editableMethods.reduce((s, m) => s + usdCoveredOf(m), 0));
   const lastAmountUsd = lastMethod != null ? round2(totalUsd - sumEditableUsd) : 0;
-  const overAllocated = lastAmountUsd < -0.001;
   const usdOf = (m: PaymentMethod) => (m === lastMethod ? lastAmountUsd : usdCoveredOf(m));
+
+  /** Abono inicial (solo a crédito): la suma de lo que el cliente deja ahora. */
+  const initialPaymentUsd = isCredit ? sumEditableUsd : totalUsd;
+  /** Lo que quedará debiendo tras la venta. */
+  const debtUsd = isCredit ? round2(totalUsd - initialPaymentUsd) : 0;
+  const overAllocated = isCredit ? debtUsd < -0.001 : lastAmountUsd < -0.001;
+
   const buildPayments = () =>
-    orderedMethods.map((m) => {
-      const usd = round2(usdOf(m));
-      const bs = PAYMENT_METHOD_CURRENCY[m] === 'BS' ? round2(usd * usdt) : 0;
-      return { method: m, amountUsd: usd, amountBs: bs };
-    });
+    orderedMethods
+      .map((m) => {
+        const usd = round2(usdOf(m));
+        const bs = PAYMENT_METHOD_CURRENCY[m] === 'BS' ? round2(usd * usdt) : 0;
+        return { method: m, amountUsd: usd, amountBs: bs };
+      })
+      // A crédito, un método sin monto no es un pago: no se registra.
+      .filter((p) => !isCredit || p.amountUsd > 0);
+
+  // Texto del botón Cobrar: con 1 método muestra el monto (USD o USD-BCV); con varios solo "Cobrar".
+  const soloMetodo = paymentMethods.length === 1 ? paymentMethods[0] : undefined;
+  const cobrarLabel = isCredit
+    ? initialPaymentUsd > 0
+      ? `Registrar a crédito (abona ${formatUsd(initialPaymentUsd)})`
+      : 'Registrar venta a crédito'
+    : soloMetodo == null
+      ? 'Cobrar'
+      : PAYMENT_METHOD_CURRENCY[soloMetodo] === 'BS'
+        ? `Cobrar ${formatUsd(totalUsdBcv)} (BCV)`
+        : `Cobrar ${formatUsd(totalUsd)}`;
 
   const focusSearch = () => setTimeout(() => searchRef.current?.focus(), 0);
 
@@ -220,6 +241,8 @@ export function CajeroPage() {
     setPaymentMethods([]);
     setPaymentAmounts({});
     setPaymentError(false);
+    setIsCredit(false);
+    setDueDate(null);
     focusSearch();
   };
 
@@ -233,18 +256,27 @@ export function CajeroPage() {
       message.warning('Selecciona o crea el cliente');
       return;
     }
-    if (paymentMethods.length === 0) {
+    // A crédito puede no haber ningún método: el cliente no deja nada ahora.
+    if (!isCredit && paymentMethods.length === 0) {
       setPaymentError(true);
       message.warning('Selecciona al menos un método de pago');
       return;
     }
+    if (isCredit && !dueDate) {
+      message.warning('Indica la fecha de pago acordada');
+      return;
+    }
     if (overAllocated) {
-      message.warning('El desglose de pago supera el total');
+      message.warning(
+        isCredit ? 'El abono inicial supera el total' : 'El desglose de pago supera el total',
+      );
       return;
     }
     modal.confirm({
-      title: '¿Cobraste la venta?',
-      content: `Total a cobrar: ${formatUsd(totalUsd)}${usdt > 0 ? ` · ${formatBs(totalBs)}` : ''}`,
+      title: isCredit ? '¿Registrar la venta a crédito?' : '¿Cobraste la venta?',
+      content: isCredit
+        ? `Queda debiendo ${formatUsd(debtUsd)} para el ${dueDate ? formatDate(dueDate.toDate()) : ''}.`
+        : `Total a cobrar: ${formatUsd(totalUsd)}${usdt > 0 ? ` · ${formatBs(totalBs)}` : ''}`,
       okText: 'Sí, registrar',
       cancelText: 'No',
       onOk: () => checkout(),
@@ -261,13 +293,19 @@ export function CajeroPage() {
         clientId: clientId ?? null,
         payments: buildPayments(),
         applyIva,
+        isCredit,
+        dueDate: isCredit && dueDate ? dueDate.format('YYYY-MM-DD') : null,
         details: cart.map((it) => ({
           productId: it.product.id,
           quantity: it.quantity,
           unitPriceUsd: it.unitPriceUsd,
         })),
       });
-      message.success(`Venta #${sale.id} registrada: ${formatUsd(Number(sale.totalUsd))}`);
+      message.success(
+        isCredit
+          ? `Venta #${sale.id} a crédito: queda debiendo ${formatUsd(debtUsd)}`
+          : `Venta #${sale.id} registrada: ${formatUsd(Number(sale.totalUsd))}`,
+      );
       setCompletedSale(sale);
       clearCart();
     } catch (err) {
@@ -635,8 +673,68 @@ export function CajeroPage() {
 
             <Divider style={{ margin: '12px 0' }} />
 
+            {/* Venta a crédito: la mercancía sale hoy y el pago queda pendiente. */}
+            <Checkbox
+              checked={isCredit}
+              onChange={(e) => {
+                setIsCredit(e.target.checked);
+                setPaymentError(false);
+                // El desglose cambia de significado (total vs. abono): se limpia
+                // para que nadie registre un monto pensado para el otro modo.
+                setPaymentAmounts({});
+                if (!e.target.checked) setDueDate(null);
+              }}
+            >
+              <Text strong>Venta a crédito</Text> (paga después)
+            </Checkbox>
+
+            {isCredit && (
+              <div style={{ marginTop: 10 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  ¿Cuándo paga?
+                </Text>
+                <DatePicker
+                  style={{ width: '100%', marginTop: 4 }}
+                  format="DD/MM/YYYY"
+                  placeholder="Fecha de pago"
+                  value={dueDate}
+                  onChange={setDueDate}
+                  disabledDate={(d) => d && d < dayjs().startOf('day')}
+                />
+                <Space size={8} style={{ marginTop: 8 }} wrap>
+                  {[8, 15, 30].map((days) => (
+                    <Button
+                      key={days}
+                      size="small"
+                      onClick={() => setDueDate(dayjs().add(days, 'day'))}
+                    >
+                      {days} días
+                    </Button>
+                  ))}
+                </Space>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: 12,
+                  }}
+                >
+                  <Text type="secondary">Queda debiendo</Text>
+                  <Text strong style={{ fontSize: 16, color: debtUsd > 0 ? '#dc3545' : undefined }}>
+                    {formatUsd(debtUsd)}
+                  </Text>
+                </div>
+              </div>
+            )}
+
+            <Divider style={{ margin: '12px 0' }} />
+
             <Text type="secondary">
-              ¿Cómo se cobra? Métodos de pago (uno o varios){' '}
+              {isCredit
+                ? '¿Abona algo ahora? (opcional)'
+                : '¿Cómo se cobra? Métodos de pago (uno o varios)'}{' '}
               {paymentError && <Text type="danger">*</Text>}
             </Text>
             <Select
@@ -659,10 +757,12 @@ export function CajeroPage() {
               }))}
             />
 
-            {orderedMethods.length >= 2 && (
+            {(isCredit ? orderedMethods.length >= 1 : orderedMethods.length >= 2) && (
               <div style={{ marginTop: 8 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Ingresa el monto de cada método (USD en $, Bs en Bs); el último se calcula solo.
+                  {isCredit
+                    ? 'Ingresa cuánto abona con cada método (USD en $, Bs en Bs).'
+                    : 'Ingresa el monto de cada método (USD en $, Bs en Bs); el último se calcula solo.'}
                 </Text>
                 {orderedMethods.map((m, i) => {
                   const isBs = PAYMENT_METHOD_CURRENCY[m] === 'BS';
@@ -733,7 +833,8 @@ export function CajeroPage() {
               disabled={
                 cart.length === 0 ||
                 clientId == null ||
-                paymentMethods.length === 0 ||
+                (!isCredit && paymentMethods.length === 0) ||
+                (isCredit && !dueDate) ||
                 overAllocated
               }
               onClick={confirmCheckout}

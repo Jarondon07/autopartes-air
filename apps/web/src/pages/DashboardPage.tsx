@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   AppstoreOutlined,
+  CreditCardOutlined,
   DollarOutlined,
   ShoppingCartOutlined,
   WarningOutlined,
@@ -8,13 +9,15 @@ import {
 import { Card, Col, Empty, List, Row, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { formatUsd } from '@autopartes-air/shared';
+import { PERMISSIONS, formatUsd } from '@autopartes-air/shared';
 import { COLORS } from '../theme/tokens';
 import type { SaleRow } from '../api/sales.api';
 import { useLowStock, useProducts } from '../hooks/useProducts';
 import { useSales, useSalesSummary } from '../hooks/useSales';
 import { useCurrentRates } from '../hooks/useExchangeRates';
+import { useAuthStore } from '../stores/auth.store';
 import { formatDate, formatShortDateTime } from '../lib/datetime';
+import { useDebtsSummary } from '../hooks/useDebts';
 
 const { Title, Text } = Typography;
 
@@ -64,11 +67,14 @@ function StatCard({ title, value, suffix, icon, color, bg, loading }: StatCardPr
 
 export function DashboardPage() {
   const today = dayjs().format('YYYY-MM-DD');
+  const hasPermission = useAuthStore((s) => s.hasPermission);
 
   const todaySummary = useSalesSummary({ from: today, to: today, status: 'completada' });
   const recentSales = useSales({ limit: 6 });
   const products = useProducts({ isActive: true, limit: 1 });
   const lowStock = useLowStock();
+  const canSeeDebts = hasPermission(PERMISSIONS.DEBTS_READ);
+  const debts = useDebtsSummary(canSeeDebts);
   const rates = useCurrentRates();
 
   const bcv = Number(rates.data?.bcv?.rateBsPerUsd ?? 0);
@@ -164,6 +170,26 @@ export function DashboardPage() {
             loading={lowStock.isLoading}
           />
         </Col>
+        {canSeeDebts && (
+          <Col xs={24} sm={12} xl={6}>
+            <StatCard
+              title="Por cobrar"
+              value={formatUsd(Number(debts.data?.totalBalanceUsd ?? 0))}
+              suffix={
+                debts.data?.overdueCount ? (
+                  <Text type="danger" style={{ fontSize: 12 }}>
+                    {debts.data.overdueCount} vencida(s) ·{' '}
+                    {formatUsd(Number(debts.data.overdueBalanceUsd))}
+                  </Text>
+                ) : undefined
+              }
+              icon={<CreditCardOutlined />}
+              color={COLORS.info}
+              bg="#d6eef2"
+              loading={debts.isLoading}
+            />
+          </Col>
+        )}
       </Row>
 
       <Row gutter={[24, 24]} style={{ marginTop: 8 }}>

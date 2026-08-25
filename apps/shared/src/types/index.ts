@@ -218,6 +218,54 @@ export interface SalePayment {
   amountBs: string;
 }
 
+/**
+ * Un pago de la venta con su momento y tasa. Los pagos del mostrador y los
+ * abonos posteriores de una deuda son la misma cosa: filas de `sale_payments`
+ * en distinta fecha.
+ */
+export interface SalePaymentRow extends SalePayment {
+  id: number;
+  saleId: number;
+  paidAt: string;
+  /** Tasa usada para convertir a Bs (null en métodos que se cobran en USD). */
+  exchangeRate: string | null;
+  userId: number | null;
+  notes: string | null;
+}
+
+/** Estado de una deuda; se deriva del saldo y la fecha de pago, no se guarda. */
+export const DEBT_STATUSES = ['pendiente', 'parcial', 'vencida', 'pagada'] as const;
+export type DebtStatus = (typeof DEBT_STATUSES)[number];
+
+/** Una venta a crédito con lo abonado y lo que falta. */
+export interface DebtRow {
+  saleId: number;
+  clientId: number | null;
+  clientName: string | null;
+  saleDate: string;
+  dueDate: string | null;
+  totalUsd: string;
+  paidUsd: string;
+  balanceUsd: string;
+  status: DebtStatus;
+  /** Días de atraso (0 si no está vencida). */
+  daysOverdue: number;
+}
+
+export interface DebtDetail extends DebtRow {
+  payments: SalePaymentRow[];
+  details: SaleDetail[];
+  notes: string | null;
+}
+
+/** Agregados de cuentas por cobrar (dashboard). */
+export interface DebtsSummary {
+  count: number;
+  totalBalanceUsd: string;
+  overdueCount: number;
+  overdueBalanceUsd: string;
+}
+
 export interface Sale {
   id: number;
   clientId: number | null;
@@ -230,6 +278,10 @@ export interface Sale {
   totalUsd: string;
   totalBs: string;
   paymentMethods: PaymentMethod[];
+  /** Venta a crédito: se entregó la mercancía y el pago queda pendiente. */
+  isCredit: boolean;
+  /** Fecha acordada de pago (`YYYY-MM-DD`). Null en ventas de contado. */
+  dueDate: string | null;
   status: SaleStatus;
   voidedAt: string | null;
   voidedBy: number | null;

@@ -16,16 +16,40 @@ export const salePaymentInputSchema = z.object({
   amountBs: moneySchema.default(0),
 });
 
-export const createSaleSchema = z.object({
-  clientId: z.number().int().positive().nullish(),
-  payments: z
-    .array(salePaymentInputSchema)
-    .min(1, 'Selecciona al menos un método de pago'),
-  notes: z.string().max(500).nullish(),
-  /** Si aplica el IVA al total. Por defecto NO se aplica. */
-  applyIva: z.boolean().optional(),
-  details: z.array(saleDetailInputSchema).min(1, 'La venta necesita al menos un producto'),
-});
+/** Fecha sin hora (`YYYY-MM-DD`), como la guarda la columna `date`. */
+export const dateOnlySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD)');
+
+export const createSaleSchema = z
+  .object({
+    clientId: z.number().int().positive().nullish(),
+    /**
+     * Desglose del pago. Vacío solo en una venta a crédito sin abono inicial:
+     * el cliente se lleva la mercancía y no deja nada.
+     */
+    payments: z.array(salePaymentInputSchema),
+    notes: z.string().max(500).nullish(),
+    /** Si aplica el IVA al total. Por defecto NO se aplica. */
+    applyIva: z.boolean().optional(),
+    /** Venta a crédito: el saldo queda como deuda del cliente. */
+    isCredit: z.boolean().optional(),
+    /** Fecha acordada de pago. Requerida en las ventas a crédito. */
+    dueDate: dateOnlySchema.nullish(),
+    details: z.array(saleDetailInputSchema).min(1, 'La venta necesita al menos un producto'),
+  })
+  .superRefine((v, ctx) => {
+    const issue = (path: string, message: string) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+
+    if (v.isCredit) {
+      // Una deuda sin dueño no se puede cobrar.
+      if (v.clientId == null) issue('clientId', 'Una venta a crédito necesita cliente');
+      if (!v.dueDate) issue('dueDate', 'Indica la fecha de pago');
+    } else if (v.payments.length === 0) {
+      issue('payments', 'Selecciona al menos un método de pago');
+    }
+  });
 
 export const saleFiltersSchema = paginationSchema.extend({
   clientId: z.coerce.number().int().positive().optional(),

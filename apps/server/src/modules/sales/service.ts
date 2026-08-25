@@ -38,9 +38,15 @@ export async function create(input: CreateSaleInput, userId: number) {
   const totalUsd = round2(subtotalUsd + ivaUsd);
   const totalBs = round2(totalUsd * rate);
 
-  // El desglose de pago (USD cubierto por método) debe cuadrar con el total.
   const paidUsd = round2(input.payments.reduce((s, p) => s + p.amountUsd, 0));
-  if (Math.abs(paidUsd - totalUsd) > 0.01) {
+  if (input.isCredit) {
+    // A crédito el pago es un abono inicial (puede ser cero); lo que no se
+    // cubra queda como deuda. Lo único inválido es pagar de más.
+    if (paidUsd - totalUsd > 0.01) {
+      throw badRequest(`El abono inicial (${paidUsd}) supera el total de la venta (${totalUsd}).`);
+    }
+  } else if (Math.abs(paidUsd - totalUsd) > 0.01) {
+    // De contado el desglose tiene que cuadrar exactamente.
     throw badRequest(`El desglose de pago (${paidUsd}) no cuadra con el total (${totalUsd}).`);
   }
 
@@ -58,17 +64,23 @@ export async function create(input: CreateSaleInput, userId: number) {
           totalUsd: totalUsd.toString(),
           totalBs: totalBs.toString(),
           paymentMethods: input.payments.map((p) => p.method),
+          isCredit: input.isCredit ?? false,
+          dueDate: input.isCredit ? input.dueDate ?? null : null,
           notes: input.notes ?? null,
         })
         .returning();
       if (!sale) throw new Error('No se pudo crear la venta');
 
       for (const p of input.payments) {
+        const amountBs = p.amountBs ?? 0;
         await tx.insert(salePayments).values({
           saleId: sale.id,
           method: p.method,
           amountUsd: p.amountUsd.toString(),
-          amountBs: (p.amountBs ?? 0).toString(),
+          amountBs: amountBs.toString(),
+          userId,
+          // Solo tiene sentido guardar tasa si de verdad se cobró en bolívares.
+          exchangeRate: amountBs > 0 ? round2(amountBs / p.amountUsd).toString() : null,
         });
       }
 
@@ -103,6 +115,20 @@ export async function voidSale(id: number, userId: number) {
   const [sale] = await db.select().from(sales).where(eq(sales.id, id));
   if (!sale) throw notFound('Venta no encontrada');
   if (sale.status === 'anulada') throw conflict('La venta ya está anulada');
+
+  // Una venta a crédito con abonos ya movió dinero: revertirla en silencio
+  // descuadraría la caja. Se bloquea y se resuelve devolviendo el dinero.
+  if (sale.isCredit) {
+    const [paid] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${salePayments.amountUsd}), 0)` })
+      .from(salePayments)
+      .where(eq(salePayments.saleId, id));
+    if (Number(paid?.total ?? 0) > 0) {
+      throw conflict(
+        'La venta a crédito tiene abonos registrados: devuelve el dinero al cliente y registra la devolución antes de anularla.',
+      );
+    }
+  }
 
   await db.transaction(async (tx) => {
     const rows = await tx
@@ -214,6 +240,8 @@ export async function getById(id: number) {
       totalUsd: sales.totalUsd,
       totalBs: sales.totalBs,
       paymentMethods: sales.paymentMethods,
+      isCredit: sales.isCredit,
+      dueDate: sales.dueDate,
       status: sales.status,
       voidedAt: sales.voidedAt,
       notes: sales.notes,

@@ -20,6 +20,7 @@ import { InventoryPage } from './pages/inventory/InventoryPage';
 import { PurchasesPage } from './pages/purchases/PurchasesPage';
 import { CajeroPage } from './pages/sales/CajeroPage';
 import { SalesListPage } from './pages/sales/SalesListPage';
+import { DebtsPage } from './pages/sales/DebtsPage';
 import { UsersPage } from './pages/config/UsersPage';
 import { RolesPage } from './pages/config/RolesPage';
 import { CarBrandsPage } from './pages/config/CarBrandsPage';
@@ -33,6 +34,7 @@ const IMPLEMENTED: Record<string, ReactNode> = {
   '/inventario': <InventoryPage />,
   '/compras': <PurchasesPage />,
   '/ventas/caja': <CajeroPage />,
+  '/ventas/deudas': <DebtsPage />,
   '/ventas': <SalesListPage />,
   '/clientes': <ClientsPage />,
   '/proveedores': <SuppliersPage />,

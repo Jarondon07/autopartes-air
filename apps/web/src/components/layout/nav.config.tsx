@@ -125,7 +125,7 @@ export const NAV_TREE: NavNode[] = [
         label: 'Deudas',
         path: '/ventas/deudas',
         icon: <CreditCardOutlined />,
-        permission: [PERMISSIONS.SALES_READ_OWN, PERMISSIONS.SALES_READ_ALL],
+        permission: PERMISSIONS.DEBTS_READ,
       },
     ],
   },

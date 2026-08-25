@@ -54,6 +54,11 @@ export const PERMISSIONS = {
   RATES_UPDATE: 'exchange_rates:update',
   RATES_DELETE: 'exchange_rates:delete',
 
+  // Deudas (ventas a crédito). Separados de los de ventas: se puede tener un
+  // cobrador que no vende, o un cajero que vende pero no cobra deudas.
+  DEBTS_READ: 'debts:read',
+  DEBTS_PAY: 'debts:pay',
+
   // Reportes
   REPORTS_SALES: 'reports:sales',
   REPORTS_INVENTORY: 'reports:inventory',
@@ -103,6 +108,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
     PERMISSIONS.SALES_CREATE,
     PERMISSIONS.SALES_READ_ALL,
     PERMISSIONS.CLIENTS_READ,
+    PERMISSIONS.DEBTS_READ,
+    PERMISSIONS.DEBTS_PAY,
     PERMISSIONS.RATES_READ,
     PERMISSIONS.REPORTS_CASH,
   ],

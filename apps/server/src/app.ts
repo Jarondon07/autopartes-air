@@ -11,6 +11,7 @@ import { carModelsRouter } from './modules/car-models/router';
 import { categoriesRouter } from './modules/categories/router';
 import { uploadsRouter } from './modules/uploads/router';
 import { clientsRouter } from './modules/clients/router';
+import { debtsRouter } from './modules/debts/router';
 import { exchangeRatesRouter } from './modules/exchange-rates/router';
 import { inventoryRouter } from './modules/inventory/router';
 import { productsRouter } from './modules/products/router';
@@ -48,6 +49,7 @@ export function createApp() {
   app.use('/api/v1/inventory', inventoryRouter);
   app.use('/api/v1/purchases', purchasesRouter);
   app.use('/api/v1/sales', salesRouter);
+  app.use('/api/v1/debts', debtsRouter);
   app.use('/api/v1/users', usersRouter);
   app.use('/api/v1/roles', rolesRouter);
   app.use('/api/v1/uploads', uploadsRouter);
