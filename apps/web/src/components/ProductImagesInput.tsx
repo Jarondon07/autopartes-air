@@ -9,6 +9,7 @@ import { App, Button, Tag, Typography, Upload } from 'antd';
 import { getApiErrorMessage } from '../api/client';
 import { uploadImage } from '../api/uploads.api';
 import { ImageCropModal } from './ImageCropModal';
+import { blobToUploadFile, fileToCropSource } from '../lib/image';
 
 const { Text } = Typography;
 
@@ -16,15 +17,6 @@ interface Props {
   value?: string[];
   onChange?: (urls: string[]) => void;
   max?: number;
-}
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 /**
@@ -44,7 +36,7 @@ export function ProductImagesInput({ value = [], onChange, max = 10 }: Props) {
       return;
     }
     try {
-      setCropSrc(await readAsDataUrl(file));
+      setCropSrc(await fileToCropSource(file));
     } catch {
       message.error('No se pudo leer la imagen');
     }
@@ -53,7 +45,7 @@ export function ProductImagesInput({ value = [], onChange, max = 10 }: Props) {
   const onCropped = async (blob: Blob) => {
     setUploading(true);
     try {
-      const file = new File([blob], 'imagen.png', { type: 'image/png' });
+      const file = blobToUploadFile(blob, 'imagen');
       const url = await uploadImage(file);
       set([...value, url]);
       setCropSrc(null);

@@ -5,18 +5,10 @@ import type { CarBrand } from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
 import { uploadImage } from '../../api/uploads.api';
 import { ImageCropModal } from '../../components/ImageCropModal';
+import { MAX_LOGO_SIDE, blobToUploadFile, fileToCropSource } from '../../lib/image';
 import { useCreateCarBrand, useUpdateCarBrand } from '../../hooks/useCarBrands';
 
 /** Lee un archivo como data URL (para pasarlo al recortador). */
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 interface Props {
   open: boolean;
   brand: CarBrand | null;
@@ -37,7 +29,7 @@ export function CarBrandFormModal({ open, brand, onClose }: Props) {
 
   const onPickFile = async (file: File) => {
     try {
-      setCropSrc(await readAsDataUrl(file));
+      setCropSrc(await fileToCropSource(file));
     } catch {
       message.error('No se pudo leer la imagen');
     }
@@ -46,7 +38,7 @@ export function CarBrandFormModal({ open, brand, onClose }: Props) {
   const onCropped = async (blob: Blob) => {
     setUploading(true);
     try {
-      const file = new File([blob], 'logo.png', { type: 'image/png' });
+      const file = blobToUploadFile(blob, 'logo');
       const url = await uploadImage(file);
       setLogoUrl(url);
       setCropSrc(null);
@@ -160,6 +152,7 @@ export function CarBrandFormModal({ open, brand, onClose }: Props) {
       </Form>
 
       <ImageCropModal
+        maxSide={MAX_LOGO_SIDE}
         open={cropSrc != null}
         src={cropSrc}
         loading={uploading}

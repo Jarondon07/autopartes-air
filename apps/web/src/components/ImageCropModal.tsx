@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Modal, Typography } from 'antd';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import { MAX_IMAGE_SIDE, canvasToJpegBlob } from '../lib/image';
 
 const { Text } = Typography;
 
@@ -10,14 +11,22 @@ interface Props {
   /** Imagen origen como data URL. */
   src: string | null;
   loading?: boolean;
+  /** Lado mayor del resultado en píxeles (default: foto de producto). */
+  maxSide?: number;
   onCancel: () => void;
   onConfirm: (blob: Blob) => void;
 }
 
-/** Genera un Blob PNG del recorte a resolución real de la imagen. */
+/**
+ * Genera un Blob JPEG del recorte, acotado a `maxSide` en su lado mayor.
+ *
+ * Antes exportaba PNG a resolución real: el recorte de una foto de teléfono
+ * pesaba más que el original y la subida moría con 413 en Nginx.
+ */
 async function cropToBlob(
   image: HTMLImageElement,
   crop: PixelCrop,
+  maxSide: number,
 ): Promise<Blob | null> {
   if (!crop.width || !crop.height) return null;
   const scaleX = image.naturalWidth / image.width;
@@ -38,11 +47,18 @@ async function cropToBlob(
     canvas.width,
     canvas.height,
   );
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
+  return canvasToJpegBlob(canvas, maxSide);
 }
 
 /** Modal para recortar una imagen con corte libre (cualquier proporción). */
-export function ImageCropModal({ open, src, loading, onCancel, onConfirm }: Props) {
+export function ImageCropModal({
+  open,
+  src,
+  loading,
+  maxSide = MAX_IMAGE_SIDE,
+  onCancel,
+  onConfirm,
+}: Props) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [crop, setCrop] = useState<Crop>();
   const [completed, setCompleted] = useState<PixelCrop>();
@@ -62,7 +78,7 @@ export function ImageCropModal({ open, src, loading, onCancel, onConfirm }: Prop
 
   const handleOk = async () => {
     if (!imgRef.current || !completed) return;
-    const blob = await cropToBlob(imgRef.current, completed);
+    const blob = await cropToBlob(imgRef.current, completed, maxSide);
     if (blob) onConfirm(blob);
   };
 
