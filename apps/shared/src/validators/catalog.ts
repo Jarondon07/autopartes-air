@@ -2,11 +2,28 @@ import { z } from 'zod';
 
 export const categorySchema = z.object({
   name: z.string().min(2).max(100),
+  /** Abreviatura para el SKU (ej. Evaporadores → EVA). */
+  abbreviation: z.string().max(10).nullish(),
   description: z.string().max(500).nullish(),
+  isActive: z.boolean().optional(),
 });
 
 export const brandSchema = z.object({
   name: z.string().min(1).max(100),
+});
+
+export const carBrandSchema = z.object({
+  name: z.string().min(1).max(100),
+  /** Abreviatura para el SKU (ej. Volkswagen → VW). */
+  abbreviation: z.string().max(10).nullish(),
+  logoUrl: z.string().max(300).nullish(),
+  isActive: z.boolean().optional(),
+});
+
+export const carModelSchema = z.object({
+  brandId: z.number().int().positive(),
+  name: z.string().min(1).max(100),
+  isActive: z.boolean().optional(),
 });
 
 export const vehicleSchema = z
@@ -24,3 +41,5 @@ export const vehicleSchema = z
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type BrandInput = z.infer<typeof brandSchema>;
 export type VehicleInput = z.infer<typeof vehicleSchema>;
+export type CarBrandInput = z.infer<typeof carBrandSchema>;
+export type CarModelInput = z.infer<typeof carModelSchema>;

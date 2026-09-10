@@ -1,0 +1,2 @@
+ALTER TABLE "products" drop column "price_usd";--> statement-breakpoint
+ALTER TABLE "products" ADD COLUMN "price_usd" numeric(14, 2) GENERATED ALWAYS AS (ceil(cost_usd * (1 + markup_pct / 100))) STORED;

@@ -1,79 +1,99 @@
 import type { ReactNode } from 'react';
 import {
-  ApartmentOutlined,
   AppstoreOutlined,
   BarChartOutlined,
+  CarOutlined,
+  ContainerOutlined,
+  CreditCardOutlined,
   DashboardOutlined,
   DollarOutlined,
   InboxOutlined,
+  PercentageOutlined,
+  ProfileOutlined,
+  SafetyCertificateOutlined,
+  SettingOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
+  ShoppingOutlined,
+  TagsOutlined,
   TeamOutlined,
+  UnorderedListOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { PERMISSIONS, type PermissionCode } from '@autopartes-air/shared';
 
-export interface NavItem {
+/** Permiso(s) requeridos para ver un item. Array = basta con tener uno. */
+type Permission = PermissionCode | PermissionCode[];
+
+/** Hoja del menú: enlaza a una ruta concreta. */
+export interface NavLeaf {
   key: string;
   label: string;
   path: string;
-  icon: ReactNode;
-  /** Permiso requerido para ver el item. Si falta, siempre visible. */
-  permission?: PermissionCode;
+  icon?: ReactNode;
+  permission?: Permission;
 }
 
-export interface NavSection {
+/** Nodo con submenú: agrupa hojas, sin ruta propia. */
+export interface NavParent {
   key: string;
-  title: string;
-  items: NavItem[];
+  label: string;
+  icon: ReactNode;
+  children: NavLeaf[];
+}
+
+export type NavNode = NavLeaf | NavParent;
+
+export function isParent(node: NavNode): node is NavParent {
+  return (node as NavParent).children !== undefined;
 }
 
 /**
- * Navegación del sidebar, agrupada por secciones (como AdminKit).
- * Los items se filtran en runtime según los permisos del usuario.
+ * Estructura de navegación del sistema (menú lateral).
+ * El filtrado por permisos se resuelve en runtime en el Sidebar.
  */
-export const NAV_SECTIONS: NavSection[] = [
+export const NAV_TREE: NavNode[] = [
   {
-    key: 'principal',
-    title: 'Principal',
-    items: [
-      { key: 'dashboard', label: 'Dashboard', path: '/', icon: <DashboardOutlined /> },
+    key: 'dashboard',
+    label: 'Dashboard',
+    path: '/',
+    icon: <DashboardOutlined />,
+  },
+  {
+    key: 'productos',
+    label: 'Productos',
+    icon: <AppstoreOutlined />,
+    children: [
       {
-        key: 'productos',
-        label: 'Productos',
+        key: 'productos-gestionar',
+        label: 'Gestionar',
         path: '/productos',
-        icon: <AppstoreOutlined />,
+        icon: <UnorderedListOutlined />,
         permission: PERMISSIONS.PRODUCTS_READ,
       },
       {
-        key: 'ventas',
-        label: 'Ventas',
-        path: '/ventas',
-        icon: <ShoppingCartOutlined />,
-        permission: PERMISSIONS.SALES_CREATE,
+        key: 'productos-inventario',
+        label: 'Inventario',
+        path: '/inventario',
+        icon: <InboxOutlined />,
+        permission: PERMISSIONS.INVENTORY_READ,
       },
     ],
   },
   {
-    key: 'inventario',
-    title: 'Inventario',
-    items: [
+    key: 'compras',
+    label: 'Compras',
+    icon: <ShoppingOutlined />,
+    children: [
       {
-        key: 'compras',
-        label: 'Compras',
+        key: 'compras-lotes',
+        label: 'Lotes',
         path: '/compras',
-        icon: <InboxOutlined />,
+        icon: <ContainerOutlined />,
         permission: PERMISSIONS.PURCHASES_READ,
       },
       {
-        key: 'inventario',
-        label: 'Inventario',
-        path: '/inventario',
-        icon: <ApartmentOutlined />,
-        permission: PERMISSIONS.INVENTORY_READ,
-      },
-      {
-        key: 'proveedores',
+        key: 'compras-proveedores',
         label: 'Proveedores',
         path: '/proveedores',
         icon: <ShopOutlined />,
@@ -82,39 +102,118 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    key: 'gestion',
-    title: 'Gestión',
-    items: [
+    key: 'ventas',
+    label: 'Ventas',
+    icon: <ShoppingCartOutlined />,
+    children: [
       {
-        key: 'clientes',
-        label: 'Clientes',
-        path: '/clientes',
-        icon: <TeamOutlined />,
-        permission: PERMISSIONS.CLIENTS_READ,
+        key: 'ventas-caja',
+        label: 'Cajero (Vender)',
+        path: '/ventas/caja',
+        icon: <DollarOutlined />,
+        permission: PERMISSIONS.SALES_CREATE,
       },
       {
-        key: 'tasas',
+        key: 'ventas-lista',
+        label: 'Ventas',
+        path: '/ventas',
+        icon: <ProfileOutlined />,
+        permission: [PERMISSIONS.SALES_READ_OWN, PERMISSIONS.SALES_READ_ALL],
+      },
+      {
+        key: 'ventas-deudas',
+        label: 'Deudas',
+        path: '/ventas/deudas',
+        icon: <CreditCardOutlined />,
+        permission: PERMISSIONS.DEBTS_READ,
+      },
+    ],
+  },
+  {
+    key: 'clientes',
+    label: 'Clientes',
+    path: '/clientes',
+    icon: <TeamOutlined />,
+    permission: PERMISSIONS.CLIENTS_READ,
+  },
+  {
+    key: 'reportes',
+    label: 'Reportes',
+    path: '/reportes',
+    icon: <BarChartOutlined />,
+    permission: [
+      PERMISSIONS.REPORTS_SALES,
+      PERMISSIONS.REPORTS_INVENTORY,
+      PERMISSIONS.REPORTS_CASH,
+      PERMISSIONS.REPORTS_ALL,
+    ],
+  },
+  {
+    key: 'configuracion',
+    label: 'Configuración',
+    icon: <SettingOutlined />,
+    children: [
+      {
+        key: 'config-usuarios',
+        label: 'Usuarios',
+        path: '/configuracion/usuarios',
+        icon: <UserOutlined />,
+        permission: PERMISSIONS.USERS_MANAGE,
+      },
+      {
+        key: 'config-roles',
+        label: 'Roles y permisos',
+        path: '/configuracion/roles',
+        icon: <SafetyCertificateOutlined />,
+        permission: PERMISSIONS.USERS_MANAGE,
+      },
+      {
+        key: 'config-categorias',
+        label: 'Categorías',
+        path: '/configuracion/categorias',
+        icon: <TagsOutlined />,
+        permission: PERMISSIONS.PRODUCTS_READ,
+      },
+      {
+        key: 'config-marcas-vehiculos',
+        label: 'Marcas de vehículos',
+        path: '/configuracion/marcas-vehiculos',
+        icon: <CarOutlined />,
+        permission: PERMISSIONS.PRODUCTS_READ,
+      },
+      {
+        key: 'config-tasas',
         label: 'Tasas de cambio',
-        path: '/tasas',
+        path: '/configuracion/tasas',
         icon: <DollarOutlined />,
         permission: PERMISSIONS.RATES_READ,
       },
       {
-        key: 'reportes',
-        label: 'Reportes',
-        path: '/reportes',
-        icon: <BarChartOutlined />,
+        key: 'config-impuestos',
+        label: 'Impuestos',
+        path: '/configuracion/impuestos',
+        icon: <PercentageOutlined />,
+        permission: PERMISSIONS.USERS_MANAGE,
       },
       {
-        key: 'usuarios',
-        label: 'Usuarios',
-        path: '/usuarios',
-        icon: <UserOutlined />,
+        key: 'config-almacenes',
+        label: 'Almacén',
+        path: '/configuracion/almacenes',
+        icon: <InboxOutlined />,
         permission: PERMISSIONS.USERS_MANAGE,
       },
     ],
   },
 ];
 
-/** Todos los items en una lista plana (para definir rutas). */
-export const ALL_NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items);
+/** Todas las hojas en una lista plana (para generar rutas). */
+export const NAV_LEAVES: NavLeaf[] = NAV_TREE.flatMap((node) =>
+  isParent(node) ? node.children : [node],
+);
+
+/** ¿El usuario tiene el/los permiso(s) requeridos por el item? */
+export function canSee(permissions: PermissionCode[], required?: Permission): boolean {
+  if (!required) return true;
+  const list = Array.isArray(required) ? required : [required];
+  return list.some((p) => permissions.includes(p));
+}

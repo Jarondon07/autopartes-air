@@ -1,11 +1,19 @@
 export const ROLES = {
+  ROOT: 'root',
   ADMIN: 'admin',
   VENDEDOR: 'vendedor',
   ALMACEN: 'almacen',
   CAJERO: 'cajero',
 } as const;
 
-export type RoleName = (typeof ROLES)[keyof typeof ROLES];
+/**
+ * Los roles son dinámicos (se pueden crear roles nuevos en runtime), por eso
+ * `RoleName` es un string libre. `ROLES` mantiene los nombres base conocidos.
+ */
+export type RoleName = string;
+
+/** Rol superusuario oculto: no se lista ni se puede editar/asignar desde la UI. */
+export const ROOT_ROLE = ROLES.ROOT;
 
 export const PERMISSIONS = {
   // Productos y catálogos auxiliares (categorías, marcas, vehículos)
@@ -19,6 +27,11 @@ export const PERMISSIONS = {
   SALES_READ_OWN: 'sales:read_own',
   SALES_READ_ALL: 'sales:read_all',
   SALES_VOID: 'sales:void',
+  /**
+   * Autorizar un precio distinto al de lista en el cajero. No se ejerce desde
+   * el menú: quien lo tiene puede desbloquear el precio con su PIN.
+   */
+  SALES_OVERRIDE_PRICE: 'sales:override_price',
 
   // Compras
   PURCHASES_READ: 'purchases:read',
@@ -46,6 +59,11 @@ export const PERMISSIONS = {
   RATES_UPDATE: 'exchange_rates:update',
   RATES_DELETE: 'exchange_rates:delete',
 
+  // Deudas (ventas a crédito). Separados de los de ventas: se puede tener un
+  // cobrador que no vende, o un cajero que vende pero no cobra deudas.
+  DEBTS_READ: 'debts:read',
+  DEBTS_PAY: 'debts:pay',
+
   // Reportes
   REPORTS_SALES: 'reports:sales',
   REPORTS_INVENTORY: 'reports:inventory',
@@ -60,7 +78,8 @@ export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export const ALL_PERMISSIONS: PermissionCode[] = Object.values(PERMISSIONS);
 
-export const ROLE_PERMISSIONS: Record<RoleName, PermissionCode[]> = {
+export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
+  [ROLES.ROOT]: ALL_PERMISSIONS,
   [ROLES.ADMIN]: ALL_PERMISSIONS,
   [ROLES.VENDEDOR]: [
     PERMISSIONS.PRODUCTS_READ,
@@ -94,6 +113,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionCode[]> = {
     PERMISSIONS.SALES_CREATE,
     PERMISSIONS.SALES_READ_ALL,
     PERMISSIONS.CLIENTS_READ,
+    PERMISSIONS.DEBTS_READ,
+    PERMISSIONS.DEBTS_PAY,
     PERMISSIONS.RATES_READ,
     PERMISSIONS.REPORTS_CASH,
   ],

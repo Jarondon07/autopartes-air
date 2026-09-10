@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -11,26 +12,32 @@ import {
   timestamp,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { brands, categories, vehicles } from './catalogs';
+import { brands, carBrands, carModels, categories, vehicles, warehouses } from './catalogs';
 
 export const products = pgTable(
   'products',
   {
     id: serial('id').primaryKey(),
     code: varchar('code', { length: 50 }).notNull().unique(),
+    partNumber: varchar('part_number', { length: 50 }).notNull().unique(),
     name: varchar('name', { length: 200 }).notNull(),
+    shortDescription: varchar('short_description', { length: 255 }),
     description: text('description'),
     categoryId: integer('category_id').references(() => categories.id),
     brandId: integer('brand_id').references(() => brands.id),
+    carBrandId: integer('car_brand_id').references(() => carBrands.id),
+    /** Sirve para cualquier vehículo (gas, aceites): sin marca ni modelos. */
+    isUniversal: boolean('is_universal').notNull().default(false),
     costUsd: numeric('cost_usd', { precision: 14, scale: 2 }).notNull().default('0'),
     markupPct: numeric('markup_pct', { precision: 5, scale: 2 }).notNull().default('30'),
-    // Columna generada: el precio de venta siempre es consistente con costo y markup
+    // Columna generada: precio de venta = costo × (1 + markup), redondeado SIEMPRE
+    // hacia arriba a dólar entero (ej. 12,35 → 13,00).
     priceUsd: numeric('price_usd', { precision: 14, scale: 2 }).generatedAlwaysAs(
-      sql`round(cost_usd * (1 + markup_pct / 100), 2)`,
+      sql`ceil(cost_usd * (1 + markup_pct / 100))`,
     ),
-    stock: integer('stock').notNull().default(0),
-    minStock: integer('min_stock').notNull().default(0),
-    location: varchar('location', { length: 100 }),
+    stock: bigint('stock', { mode: 'number' }).notNull().default(0),
+    minStock: bigint('min_stock', { mode: 'number' }).notNull().default(0),
+    warehouseId: integer('warehouse_id').references(() => warehouses.id),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -53,4 +60,45 @@ export const productVehicles = pgTable(
       .references(() => vehicles.id, { onDelete: 'cascade' }),
   },
   (t) => [primaryKey({ columns: [t.productId, t.vehicleId] })],
+);
+
+/** Imágenes de un producto (galería). `sortOrder` define la posición; 0 = principal. */
+export const productImages = pgTable('product_images', {
+  id: serial('id').primaryKey(),
+  productId: integer('product_id')
+    .notNull()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  url: varchar('url', { length: 300 }).notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
+/** Categorías de un producto (N:M). La primera (sortOrder 0) es la principal y define el SKU. */
+export const productCategories = pgTable(
+  'product_categories',
+  {
+    productId: integer('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.productId, t.categoryId] })],
+);
+
+/** Modelos de carro a los que sirve un producto (N:M), con rango de años por modelo. */
+export const productCarModels = pgTable(
+  'product_car_models',
+  {
+    productId: integer('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    carModelId: integer('car_model_id')
+      .notNull()
+      .references(() => carModels.id, { onDelete: 'cascade' }),
+    yearFrom: integer('year_from'),
+    yearTo: integer('year_to'),
+  },
+  (t) => [primaryKey({ columns: [t.productId, t.carModelId] })],
 );

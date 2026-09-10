@@ -17,11 +17,12 @@ export const badRequest = (msg: string, details?: unknown) =>
   new ApiError(400, 'BAD_REQUEST', msg, details);
 export const unauthorized = (msg = 'No autenticado') =>
   new ApiError(401, 'UNAUTHORIZED', msg);
-export const forbidden = (msg = 'No tiene permisos para esta acción') =>
-  new ApiError(403, 'FORBIDDEN', msg);
+export const forbidden = (msg = 'No tiene permisos para esta acción', code = 'FORBIDDEN') =>
+  new ApiError(403, code, msg);
 export const notFound = (msg = 'Recurso no encontrado') =>
   new ApiError(404, 'NOT_FOUND', msg);
 export const conflict = (msg: string) => new ApiError(409, 'CONFLICT', msg);
+export const tooManyRequests = (msg: string) => new ApiError(429, 'TOO_MANY_REQUESTS', msg);
 
 export function errorHandler(
   err: unknown,

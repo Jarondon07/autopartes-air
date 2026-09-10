@@ -9,6 +9,10 @@ interface AuthState {
   setSession: (accessToken: string, user: AuthUser) => void;
   /** Actualiza solo el token (usado por el refresh silencioso). */
   setAccessToken: (accessToken: string) => void;
+  /** Actualiza solo el usuario en memoria (ej. tras editar el perfil). */
+  setUser: (user: AuthUser) => void;
+  /** Marca la sesión como "debe cambiar contraseña" (ver interceptor de Axios). */
+  markMustChangePassword: () => void;
   clear: () => void;
   hasPermission: (permission: PermissionCode) => boolean;
 }
@@ -28,6 +32,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ accessToken, user, isAuthenticated: true }),
 
   setAccessToken: (accessToken) => set({ accessToken }),
+
+  setUser: (user) => set({ user }),
+
+  markMustChangePassword: () =>
+    set((s) => (s.user ? { user: { ...s.user, mustChangePassword: true } } : {})),
 
   clear: () => set({ accessToken: null, user: null, isAuthenticated: false }),
 

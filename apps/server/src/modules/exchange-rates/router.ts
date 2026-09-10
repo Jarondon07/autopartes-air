@@ -5,6 +5,7 @@ import {
   PERMISSIONS,
   createExchangeRateSchema,
   paginationSchema,
+  type ExchangeRateSource,
 } from '@autopartes-air/shared';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/rbac';
@@ -41,7 +42,7 @@ exchangeRatesRouter.get(
       const { page, limit, source } = req.query as unknown as {
         page: number;
         limit: number;
-        source?: 'bcv' | 'paralelo';
+        source?: ExchangeRateSource;
       };
       const { rows, total } = await service.list({ page, limit, source });
       paginated(res, rows, { page, limit, total });
@@ -58,6 +59,19 @@ exchangeRatesRouter.post(
   async (req, res, next) => {
     try {
       created(res, await service.create(req.body, req.user!.sub));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Actualización manual: consulta Radar en el momento (botón "Actualizar ahora").
+exchangeRatesRouter.post(
+  '/refresh',
+  requirePermission(PERMISSIONS.RATES_CREATE),
+  async (_req, res, next) => {
+    try {
+      ok(res, await service.refresh());
     } catch (err) {
       next(err);
     }
