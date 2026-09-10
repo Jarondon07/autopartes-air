@@ -8,6 +8,7 @@ import { useSessionBootstrap } from './hooks/useAuth';
 import { PERMISSIONS } from '@autopartes-air/shared';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { CatalogPage } from './pages/CatalogPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ProductsPage } from './pages/products/ProductsPage';
@@ -63,6 +64,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Catálogo público: única pantalla que se ve sin iniciar sesión. */}
+      <Route path="/catalogo" element={<CatalogPage />} />
 
       <Route element={<ProtectedRoute bootstrapping={isLoading} />}>
         <Route element={<AppLayout />}>

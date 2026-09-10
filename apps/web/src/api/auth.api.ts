@@ -4,6 +4,7 @@ import type {
   ChangePasswordInput,
   LoginInput,
   LoginResponse,
+  SetSecurityPinInput,
   UpdateProfileInput,
 } from '@autopartes-air/shared';
 import { api } from './client';
@@ -45,5 +46,11 @@ export async function updateProfile(input: UpdateProfileInput): Promise<AuthUser
  */
 export async function changePassword(input: ChangePasswordInput): Promise<LoginResponse> {
   const { data } = await api.post<ApiSuccess<LoginResponse>>('/auth/change-password', input);
+  return data.data;
+}
+
+/** PUT /auth/security-pin — fija o cambia el PIN de autorización propio. */
+export async function setSecurityPin(input: SetSecurityPinInput): Promise<AuthUser> {
+  const { data } = await api.put<ApiSuccess<AuthUser>>('/auth/security-pin', input);
   return data.data;
 }

@@ -129,13 +129,19 @@ async function setImages(tx: Executor, productId: number, urls: string[]): Promi
   }
 }
 
-export async function list(f: ProductFilters) {
+/**
+ * Traduce una búsqueda multi-palabra a condiciones SQL: cada palabra debe
+ * coincidir en ALGÚN campo (OR), y todas las palabras deben cumplirse (AND).
+ * Así "evaporador toyota" o "toyota yaris" encuentran combinando nombre +
+ * marca del carro + modelo.
+ *
+ * Está aparte de `list()` porque el catálogo público hace su propio SELECT
+ * (recortado) pero busca exactamente igual.
+ */
+export function searchConditions(q: string): SQL[] {
   const conditions: SQL[] = [];
-  if (f.q) {
-    // Búsqueda multi-palabra: cada palabra debe coincidir en ALGÚN campo (OR),
-    // y todas las palabras deben cumplirse (AND). Así "evaporador toyota" o
-    // "toyota yaris" encuentran combinando nombre + marca del carro + modelo.
-    const tokens = f.q.trim().split(/\s+/).filter(Boolean).slice(0, 6);
+  {
+    const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, 6);
     for (const token of tokens) {
       const like = `%${token}%`;
       conditions.push(
@@ -174,6 +180,11 @@ export async function list(f: ProductFilters) {
       );
     }
   }
+  return conditions;
+}
+
+export async function list(f: ProductFilters) {
+  const conditions: SQL[] = f.q ? searchConditions(f.q) : [];
   if (f.categoryId) {
     // Coincide si el producto tiene esa categoría en CUALQUIER posición (no solo la principal).
     conditions.push(

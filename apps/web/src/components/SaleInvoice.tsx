@@ -65,10 +65,32 @@ export function SaleInvoice({ sale }: { sale: SaleDetail }) {
           { title: 'Cant.', dataIndex: 'quantity', width: 60, align: 'right' },
           {
             title: 'Precio',
-            dataIndex: 'unitPriceUsd',
-            width: 90,
+            key: 'price',
+            width: 110,
             align: 'right',
-            render: (v: string) => formatUsd(Number(v)),
+            // Si el renglón se vendió fuera de lista, se muestra el precio
+            // original tachado y quién lo autorizó: la factura es el registro.
+            render: (_, d) => (
+              <>
+                {formatUsd(Number(d.unitPriceUsd))}
+                {d.originalPriceUsd != null && (
+                  <>
+                    <br />
+                    <Text delete type="secondary" style={{ fontSize: 11 }}>
+                      {formatUsd(Number(d.originalPriceUsd))}
+                    </Text>
+                    {d.authorizedByName && (
+                      <>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          Aut.: {d.authorizedByName}
+                        </Text>
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            ),
           },
           {
             title: 'Subtotal',

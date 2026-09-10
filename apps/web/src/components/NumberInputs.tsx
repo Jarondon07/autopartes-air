@@ -29,6 +29,8 @@ interface AmountProps {
   placeholder?: string;
   size?: 'small' | 'middle' | 'large';
   style?: CSSProperties;
+  /** Útil para normalizar el valor al salir del campo. */
+  onBlur?: () => void;
 }
 
 /**

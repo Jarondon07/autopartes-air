@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   CheckCircleOutlined,
+  DollarOutlined,
   EditOutlined,
   EyeOutlined,
   PictureOutlined,
@@ -35,6 +36,7 @@ import { useBrands, useCategories } from '../../hooks/useCatalogs';
 import { useCarBrands } from '../../hooks/useCarBrands';
 import { useCurrentRates } from '../../hooks/useExchangeRates';
 import { useProduct, useProducts, useUpdateProduct } from '../../hooks/useProducts';
+import { PriceEditModal } from './PriceEditModal';
 import { useAuthStore } from '../../stores/auth.store';
 
 const { Title, Text } = Typography;
@@ -60,6 +62,8 @@ export function ProductsPage() {
 
   const [filters, setFilters] = useState<Filters>({ page: 1, limit: 20 });
   const [previewId, setPreviewId] = useState<number | null>(null);
+  /** Producto cuyo precio se está reajustando desde la lista (null = cerrado). */
+  const [pricing, setPricing] = useState<ProductRow | null>(null);
 
   const products = useProducts(filters);
   const categories = useCategories();
@@ -123,7 +127,15 @@ export function ProductsPage() {
       dataIndex: 'priceUsd',
       width: 110,
       align: 'right',
-      render: (v: string) => <Text strong>{formatUsd(Number(v))}</Text>,
+      // Los precios cambian seguido: se editan aquí mismo, sin abrir la ficha.
+      render: (v: string, row) =>
+        canUpdate ? (
+          <Button type="link" style={{ padding: 0 }} onClick={() => setPricing(row)}>
+            <Text strong>{formatUsd(Number(v))}</Text>
+          </Button>
+        ) : (
+          <Text strong>{formatUsd(Number(v))}</Text>
+        ),
     },
     {
       title: 'Precio Bs',
@@ -183,6 +195,14 @@ export function ProductsPage() {
             onClick={() => setPreviewId(product.id)}
             title="Vista previa"
           />
+          {canUpdate && (
+            <Button
+              type="text"
+              icon={<DollarOutlined />}
+              onClick={() => setPricing(product)}
+              title="Cambiar precio"
+            />
+          )}
           {canUpdate && (
             <Button
               type="text"
@@ -312,6 +332,11 @@ export function ProductsPage() {
                 <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewId(p.id)}>
                   Ver
                 </Button>
+                {canUpdate && (
+                  <Button size="small" icon={<DollarOutlined />} onClick={() => setPricing(p)}>
+                    Precio
+                  </Button>
+                )}
                 {canUpdate && (
                   <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(p.id)}>
                     Editar
@@ -448,6 +473,8 @@ export function ProductsPage() {
           </>
         )}
       </Drawer>
+
+      <PriceEditModal product={pricing} onClose={() => setPricing(null)} />
     </div>
   );
 }

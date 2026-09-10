@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import type {
   ChangePasswordInput,
   LoginInput,
+  SetSecurityPinInput,
   UpdateProfileInput,
 } from '@autopartes-air/shared';
 import * as authApi from '../api/auth.api';
@@ -32,6 +33,18 @@ export function useUpdateProfile() {
   const setUser = useAuthStore((s) => s.setUser);
   return useMutation({
     mutationFn: (input: UpdateProfileInput) => authApi.updateProfile(input),
+    onSuccess: (user) => setUser(user),
+  });
+}
+
+/**
+ * Fija o cambia el PIN de autorización propio. Solo cambia `hasSecurityPin`
+ * del usuario en sesión: el PIN nunca llega al cliente.
+ */
+export function useSetSecurityPin() {
+  const setUser = useAuthStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: (input: SetSecurityPinInput) => authApi.setSecurityPin(input),
     onSuccess: (user) => setUser(user),
   });
 }

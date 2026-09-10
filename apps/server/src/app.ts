@@ -8,6 +8,7 @@ import { authRouter } from './modules/auth/router';
 import { brandsRouter } from './modules/brands/router';
 import { carBrandsRouter } from './modules/car-brands/router';
 import { carModelsRouter } from './modules/car-models/router';
+import { catalogRouter } from './modules/catalog/router';
 import { categoriesRouter } from './modules/categories/router';
 import { uploadsRouter } from './modules/uploads/router';
 import { clientsRouter } from './modules/clients/router';
@@ -37,6 +38,8 @@ export function createApp() {
   });
 
   app.use('/api/v1/auth', authRouter);
+  // Catálogo público: sin sesión, para que el cliente vea precios antes de entrar.
+  app.use('/api/v1/public', catalogRouter);
 
   // Fase 2 — CRUD Core
   app.use('/api/v1/products', productsRouter);

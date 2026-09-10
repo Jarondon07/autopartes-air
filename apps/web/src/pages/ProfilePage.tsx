@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { LockOutlined } from '@ant-design/icons';
+import { LockOutlined, NumberOutlined } from '@ant-design/icons';
 import {
   App,
   Avatar,
@@ -13,7 +13,7 @@ import {
   Typography,
 } from 'antd';
 import { getApiErrorMessage } from '../api/client';
-import { useChangePassword, useUpdateProfile } from '../hooks/useAuth';
+import { useChangePassword, useSetSecurityPin, useUpdateProfile } from '../hooks/useAuth';
 import { useAuthStore } from '../stores/auth.store';
 import { COLORS } from '../theme/tokens';
 
@@ -30,9 +30,11 @@ export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
+  const [pinForm] = Form.useForm();
 
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
+  const setPin = useSetSecurityPin();
 
   useEffect(() => {
     profileForm.setFieldsValue({ fullName: user?.fullName });
@@ -44,6 +46,16 @@ export function ProfilePage() {
       message.success('Perfil actualizado');
     } catch (err) {
       message.error(getApiErrorMessage(err, 'No se pudo actualizar el perfil'));
+    }
+  };
+
+  const onSetPin = async (values: { currentPassword: string; pin: string }) => {
+    try {
+      await setPin.mutateAsync({ currentPassword: values.currentPassword, pin: values.pin });
+      message.success('PIN de autorización guardado');
+      pinForm.resetFields();
+    } catch (err) {
+      message.error(getApiErrorMessage(err, 'No se pudo guardar el PIN'));
     }
   };
 
@@ -162,6 +174,76 @@ export function ProfilePage() {
                 loading={changePassword.isPending}
               >
                 Cambiar contraseña
+              </Button>
+            </Form>
+          </Card>
+          <Card
+            title="PIN de autorización"
+            style={{ marginTop: 24 }}
+            extra={
+              user?.hasSecurityPin ? (
+                <Tag color="success">Configurado</Tag>
+              ) : (
+                <Tag>Sin configurar</Tag>
+              )
+            }
+          >
+            <Text type="secondary">
+              Sirve para autorizar acciones en el mostrador sin teclear tu contraseña
+              delante del cliente (por ejemplo, cambiar el precio de un artículo en el
+              cajero). Solo funciona si tu rol tiene ese permiso.
+            </Text>
+            <Form
+              form={pinForm}
+              layout="vertical"
+              onFinish={onSetPin}
+              style={{ marginTop: 16 }}
+            >
+              <Form.Item
+                name="currentPassword"
+                label="Tu contraseña"
+                rules={[{ required: true, message: 'Ingresa tu contraseña' }]}
+              >
+                <Input.Password prefix={<LockOutlined />} placeholder="••••••••" />
+              </Form.Item>
+              <Form.Item
+                name="pin"
+                label={user?.hasSecurityPin ? 'Nuevo PIN' : 'PIN'}
+                rules={[
+                  { required: true, message: 'Ingresa el PIN' },
+                  { pattern: /^\d{4,6}$/, message: 'El PIN son 4 a 6 dígitos' },
+                ]}
+              >
+                <Input.Password
+                  prefix={<NumberOutlined />}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="4 a 6 dígitos"
+                />
+              </Form.Item>
+              <Form.Item
+                name="confirmPin"
+                label="Confirmar PIN"
+                dependencies={['pin']}
+                rules={[
+                  { required: true, message: 'Confirma el PIN' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('pin') === value) return Promise.resolve();
+                      return Promise.reject(new Error('Los PIN no coinciden'));
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password
+                  prefix={<NumberOutlined />}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="4 a 6 dígitos"
+                />
+              </Form.Item>
+              <Button type="primary" htmlType="submit" loading={setPin.isPending}>
+                {user?.hasSecurityPin ? 'Cambiar PIN' : 'Guardar PIN'}
               </Button>
             </Form>
           </Card>

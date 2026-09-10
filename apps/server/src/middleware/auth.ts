@@ -38,7 +38,15 @@ function verifyToken(req: Request, next: NextFunction): AccessTokenPayload | nul
 
   const token = header.slice('Bearer '.length);
   try {
-    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as unknown as AccessTokenPayload;
+    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as unknown as AccessTokenPayload & {
+      scope?: string;
+    };
+    // Los tokens con `scope` (p. ej. la autorización de precio) se firman con
+    // este mismo secreto pero NO son sesiones: no sirven para identificarse.
+    if (payload.scope != null) {
+      next(unauthorized('Token inválido o expirado'));
+      return null;
+    }
     req.user = payload;
     return payload;
   } catch {

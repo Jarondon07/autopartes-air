@@ -31,6 +31,10 @@ export interface SaleDetailRow {
   quantity: number;
   unitPriceUsd: string;
   subtotalUsd: string;
+  /** Precio de lista, solo si el renglón se vendió a otro precio. */
+  originalPriceUsd: string | null;
+  /** Quién autorizó ese precio con su PIN. */
+  authorizedByName: string | null;
 }
 
 export interface SaleDetail extends SaleRow {
@@ -89,5 +93,27 @@ export async function createSale(input: CreateSaleInput): Promise<SaleDetail> {
 
 export async function voidSale(id: number): Promise<SaleDetail> {
   const { data } = await api.post<ApiSuccess<SaleDetail>>(`/sales/${id}/void`);
+  return data.data;
+}
+
+export interface PriceAuthorization {
+  /** Token de 5 minutos que se adjunta a la venta. */
+  token: string;
+  authorizedBy: string;
+}
+
+/**
+ * POST /sales/price-authorization — pide autorización para vender fuera del
+ * precio de lista. El supervisor teclea su usuario y PIN; la sesión del cajero
+ * no cambia.
+ */
+export async function requestPriceAuthorization(input: {
+  username: string;
+  pin: string;
+}): Promise<PriceAuthorization> {
+  const { data } = await api.post<ApiSuccess<PriceAuthorization>>(
+    '/sales/price-authorization',
+    input,
+  );
   return data.data;
 }

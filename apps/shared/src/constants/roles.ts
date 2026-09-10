@@ -27,6 +27,11 @@ export const PERMISSIONS = {
   SALES_READ_OWN: 'sales:read_own',
   SALES_READ_ALL: 'sales:read_all',
   SALES_VOID: 'sales:void',
+  /**
+   * Autorizar un precio distinto al de lista en el cajero. No se ejerce desde
+   * el menú: quien lo tiene puede desbloquear el precio con su PIN.
+   */
+  SALES_OVERRIDE_PRICE: 'sales:override_price',
 
   // Compras
   PURCHASES_READ: 'purchases:read',

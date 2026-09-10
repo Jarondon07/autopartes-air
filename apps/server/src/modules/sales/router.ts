@@ -3,14 +3,18 @@ import {
   PERMISSIONS,
   createSaleSchema,
   idParamSchema,
+  priceAuthorizationSchema,
   saleFiltersSchema,
   salesSummaryQuerySchema,
 } from '@autopartes-air/shared';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/rbac';
 import { validate } from '../../middleware/validate';
+import { clearFailures, registerFailure, retryAfter } from '../../lib/rate-limit';
+import * as authService from '../auth/service';
+import { signPriceAuthToken } from './price-auth';
 import { created, ok, paginated } from '../../lib/respond';
-import { forbidden } from '../../middleware/error';
+import { forbidden, tooManyRequests } from '../../middleware/error';
 import * as service from './service';
 
 export const salesRouter = Router();
@@ -94,6 +98,56 @@ salesRouter.post(
   async (req, res, next) => {
     try {
       ok(res, await service.voidSale(Number(req.params.id), req.user!.sub));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * Autoriza un precio distinto al de lista: usuario con `sales:override_price`
+ * + su PIN. No cambia la sesión del cajero; devuelve un token de 5 minutos que
+ * se adjunta a la venta.
+ *
+ * Va limitado por intentos: un PIN de 4 dígitos son 10.000 combinaciones, que
+ * sin freno se prueban en segundos.
+ */
+const PIN_LIMIT = { max: 5, windowMs: 15 * 60 * 1000 };
+
+salesRouter.post(
+  '/price-authorization',
+  requirePermission(PERMISSIONS.SALES_CREATE),
+  validate(priceAuthorizationSchema),
+  async (req, res, next) => {
+    const { username, pin } = req.body as { username: string; pin: string };
+    // Se limita por usuario a autorizar, no por IP: en la tienda todos los
+    // equipos salen por la misma IP y se bloquearían entre sí.
+    const key = `pin:${username.toLowerCase()}`;
+    try {
+      const wait = retryAfter(key, PIN_LIMIT);
+      if (wait > 0) {
+        throw tooManyRequests(
+          `Demasiados intentos fallidos. Espera ${Math.ceil(wait / 60)} minuto(s).`,
+        );
+      }
+
+      let authorizer;
+      try {
+        authorizer = await authService.verifySecurityPin(
+          username,
+          pin,
+          PERMISSIONS.SALES_OVERRIDE_PRICE,
+        );
+      } catch (err) {
+        registerFailure(key, PIN_LIMIT);
+        throw err;
+      }
+      clearFailures(key);
+
+      ok(res, {
+        token: signPriceAuthToken(authorizer.id, authorizer.fullName),
+        authorizedBy: authorizer.fullName,
+      });
     } catch (err) {
       next(err);
     }

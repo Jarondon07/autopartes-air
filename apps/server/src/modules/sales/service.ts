@@ -1,12 +1,17 @@
 import { and, desc, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import { round2, type CreateSaleInput, type SaleFilters } from '@autopartes-air/shared';
 import { db } from '../../infra/db';
-import { clients, products, saleDetails, salePayments, sales } from '../../db/schema';
-import { badRequest, conflict, notFound } from '../../middleware/error';
+import { alias } from 'drizzle-orm/pg-core';
+import { clients, products, saleDetails, salePayments, sales, users } from '../../db/schema';
+
+/** `users` bajo otro nombre: en la consulta de detalles es "quien autorizó el precio". */
+const authorizers = alias(users, 'price_authorizers');
+import { badRequest, conflict, forbidden, notFound } from '../../middleware/error';
 import { withForeignKeyGuard } from '../../lib/db-errors';
 import { applyStockChange } from '../inventory/service';
 import { getBcvRate } from '../exchange-rates/service';
 import { getAppliedRate } from '../taxes/service';
+import { verifyPriceAuthToken } from './price-auth';
 
 /**
  * Registra una venta (factura):
@@ -22,15 +27,58 @@ export async function create(input: CreateSaleInput, userId: number) {
   // Precios vigentes de los productos involucrados.
   const ids = input.details.map((d) => d.productId);
   const prods = await db
-    .select({ id: products.id, priceUsd: products.priceUsd })
+    .select({
+      id: products.id,
+      name: products.name,
+      priceUsd: products.priceUsd,
+      costUsd: products.costUsd,
+    })
     .from(products)
     .where(inArray(products.id, ids));
-  const priceMap = new Map(prods.map((p) => [p.id, Number(p.priceUsd)]));
+  const prodMap = new Map(prods.map((p) => [p.id, p]));
+
+  /**
+   * Quién avaló los precios fuera de lista, si hubo alguno. El token se pide
+   * una sola vez aunque se cambien varios renglones: es la autorización de
+   * esta venta, no de cada línea.
+   */
+  let authorizer: { authorizerId: number; authorizerName: string } | null = null;
 
   const details = input.details.map((d) => {
-    const price = d.unitPriceUsd ?? priceMap.get(d.productId);
-    if (price == null) throw notFound(`Producto ${d.productId} no encontrado`);
-    return { ...d, unitPriceUsd: price, subtotalUsd: round2(d.quantity * price) };
+    const prod = prodMap.get(d.productId);
+    if (!prod) throw notFound(`Producto ${d.productId} no encontrado`);
+
+    const listPrice = Number(prod.priceUsd);
+    const price = d.unitPriceUsd ?? listPrice;
+    // Céntimos de diferencia son ruido de redondeo, no un cambio de precio.
+    const isOverride = Math.abs(price - listPrice) > 0.001;
+
+    if (isOverride) {
+      // Sin token no se toca el precio: hasta ahora el servidor aceptaba
+      // cualquier `unitPriceUsd` que le mandaran, y eso es vender a lo que sea.
+      if (!input.priceAuthToken) {
+        throw forbidden(
+          `El precio de "${prod.name}" no es el de lista. Se necesita la autorización de un supervisor.`,
+        );
+      }
+      authorizer ??= verifyPriceAuthToken(input.priceAuthToken);
+
+      // Piso: el costo del último lote. Vender por debajo es perder dinero en
+      // cada unidad, y ninguna autorización lo vuelve buena idea.
+      const cost = Number(prod.costUsd);
+      if (cost > 0 && price < cost) {
+        throw badRequest(
+          `El precio de "${prod.name}" (${price}) no puede ser menor al costo (${cost}).`,
+        );
+      }
+    }
+
+    return {
+      ...d,
+      unitPriceUsd: price,
+      subtotalUsd: round2(d.quantity * price),
+      originalPriceUsd: isOverride ? listPrice : null,
+    };
   });
 
   const subtotalUsd = round2(details.reduce((s, d) => s + d.subtotalUsd, 0));
@@ -91,6 +139,8 @@ export async function create(input: CreateSaleInput, userId: number) {
           quantity: d.quantity,
           unitPriceUsd: d.unitPriceUsd.toString(),
           subtotalUsd: d.subtotalUsd.toString(),
+          originalPriceUsd: d.originalPriceUsd?.toString() ?? null,
+          authorizedBy: d.originalPriceUsd != null ? authorizer?.authorizerId ?? null : null,
         });
         // Descuenta stock (cantidad negativa) + movimiento 'venta'.
         await applyStockChange(tx, {
@@ -261,9 +311,13 @@ export async function getById(id: number) {
       quantity: saleDetails.quantity,
       unitPriceUsd: saleDetails.unitPriceUsd,
       subtotalUsd: saleDetails.subtotalUsd,
+      // Solo vienen con valor si el renglón se vendió fuera del precio de lista.
+      originalPriceUsd: saleDetails.originalPriceUsd,
+      authorizedByName: authorizers.fullName,
     })
     .from(saleDetails)
     .innerJoin(products, eq(saleDetails.productId, products.id))
+    .leftJoin(authorizers, eq(saleDetails.authorizedBy, authorizers.id))
     .where(eq(saleDetails.saleId, id));
 
   const payments = await db

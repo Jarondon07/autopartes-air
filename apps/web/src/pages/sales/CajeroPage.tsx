@@ -2,11 +2,13 @@ import { useMemo, useRef, useState } from 'react';
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
+  LockOutlined,
   PictureOutlined,
   PlusOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
 import {
+  Alert,
   App,
   Avatar,
   Button,
@@ -40,6 +42,7 @@ import { getApiErrorMessage } from '../../api/client';
 import { listProducts, type ProductRow } from '../../api/products.api';
 import { MoneyInput, QuantityInput } from '../../components/NumberInputs';
 import { ClientPicker } from './ClientPicker';
+import { PriceAuthModal } from './PriceAuthModal';
 import { ProductPreview } from '../../components/ProductPreview';
 import { DataTable } from '../../components/DataTable';
 import { useIsMobile } from '../../hooks/useResponsive';
@@ -58,6 +61,8 @@ interface CartItem {
   product: Product;
   quantity: number;
   unitPriceUsd: number;
+  /** Precio de lista al agregarlo: contra este se compara si hubo cambio. */
+  listPriceUsd: number;
 }
 
 function formatBs(n: number): string {
@@ -71,6 +76,13 @@ export function CajeroPage() {
   const searchRef = useRef<InputRef>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  /**
+   * Autorización vigente para vender fuera del precio de lista. Dura 5 minutos
+   * y cubre toda la venta: se pide una vez aunque se ajusten varios renglones.
+   */
+  const [priceAuth, setPriceAuth] = useState<{ token: string; by: string } | null>(null);
+  /** Producto cuyo precio se está desbloqueando (null = modal cerrado). */
+  const [authTarget, setAuthTarget] = useState<CartItem | null>(null);
   const [query, setQuery] = useState('');
   const [resultQty, setResultQty] = useState<Record<number, number>>({});
   const [clientId, setClientId] = useState<number | undefined>();
@@ -183,7 +195,8 @@ export function CajeroPage() {
           it.product.id === product.id ? { ...it, quantity: newQty } : it,
         );
       }
-      return [...prev, { product, quantity: newQty, unitPriceUsd: Number(product.priceUsd) }];
+      const listPriceUsd = Number(product.priceUsd);
+      return [...prev, { product, quantity: newQty, unitPriceUsd: listPriceUsd, listPriceUsd }];
     });
   };
 
@@ -234,8 +247,30 @@ export function CajeroPage() {
   const removeItem = (id: number) =>
     setCart((prev) => prev.filter((it) => it.product.id !== id));
 
+  /** ¿Algún renglón va a un precio distinto al de lista? */
+  const hasOverride = useMemo(
+    () => cart.some((it) => Math.abs(it.unitPriceUsd - it.listPriceUsd) > 0.001),
+    [cart],
+  );
+
+  /** Aplica un precio autorizado a un renglón. */
+  const setItemPrice = (productId: number, price: number) =>
+    setCart((prev) =>
+      prev.map((it) => (it.product.id === productId ? { ...it, unitPriceUsd: price } : it)),
+    );
+
+  /** Devuelve el renglón a su precio de lista. */
+  const resetItemPrice = (productId: number) =>
+    setCart((prev) =>
+      prev.map((it) =>
+        it.product.id === productId ? { ...it, unitPriceUsd: it.listPriceUsd } : it,
+      ),
+    );
+
   const clearCart = () => {
     setCart([]);
+    // La autorización muere con la venta: la siguiente se pide de nuevo.
+    setPriceAuth(null);
     setClientId(undefined);
     setApplyIva(false);
     setPaymentMethods([]);
@@ -300,6 +335,8 @@ export function CajeroPage() {
           quantity: it.quantity,
           unitPriceUsd: it.unitPriceUsd,
         })),
+        // Solo viaja si de verdad se cambió algún precio; el servidor lo exige.
+        priceAuthToken: hasOverride ? priceAuth?.token ?? null : null,
       });
       message.success(
         isCredit
@@ -311,6 +348,58 @@ export function CajeroPage() {
     } catch (err) {
       message.error(getApiErrorMessage(err, 'No se pudo registrar la venta'));
     }
+  };
+
+  /**
+   * Celda del precio unitario en el carrito.
+   *
+   * Bloqueada por defecto: el precio de venta no es cosa del cajero. El candado
+   * pide el PIN de un supervisor y, mientras la autorización esté viva, el
+   * campo se puede editar (arriba o abajo, nunca por debajo del costo — eso lo
+   * rechaza el servidor, que es quien tiene el costo real).
+   */
+  const priceCell = (it: CartItem) => {
+    const changed = Math.abs(it.unitPriceUsd - it.listPriceUsd) > 0.001;
+    if (priceAuth == null) {
+      return (
+        <div style={{ textAlign: 'right' }}>
+          {moneyCell(it.unitPriceUsd)}
+          <Button
+            type="link"
+            size="small"
+            icon={<LockOutlined />}
+            style={{ paddingInline: 0 }}
+            onClick={() => setAuthTarget(it)}
+          >
+            Cambiar precio
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div style={{ textAlign: 'right' }}>
+        <MoneyInput
+          value={it.unitPriceUsd}
+          onChange={(v) => setItemPrice(it.product.id, v ?? 0)}
+          style={{ width: '100%' }}
+        />
+        {changed ? (
+          <div style={{ marginTop: 4 }}>
+            <Text delete type="secondary" style={{ fontSize: 12 }}>
+              {formatUsd(it.listPriceUsd)}
+            </Text>{' '}
+            <Button
+              type="link"
+              size="small"
+              style={{ paddingInline: 0 }}
+              onClick={() => resetItemPrice(it.product.id)}
+            >
+              Restaurar
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   /** Celda de precio: USD de venta + Bs (× USDT) + USD (BCV) (= Bs ÷ BCV). */
@@ -387,9 +476,9 @@ export function CajeroPage() {
     {
       title: 'Precio unit.',
       key: 'price',
-      width: 140,
+      width: 170,
       align: 'right',
-      render: (_, it) => moneyCell(it.unitPriceUsd),
+      render: (_, it) => priceCell(it),
     },
     {
       title: 'Subtotal',
@@ -573,6 +662,31 @@ export function CajeroPage() {
               )}
             </div>
 
+            {priceAuth && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`Precios desbloqueados por ${priceAuth.by}`}
+                description="Puedes ajustar el precio unitario de los renglones. Se registra en la venta quién lo autorizó."
+                action={
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      // Bloquear devuelve todo a precio de lista: si el cajero
+                      // cierra la autorización, no queda ningún precio suelto.
+                      setCart((prev) =>
+                        prev.map((it) => ({ ...it, unitPriceUsd: it.listPriceUsd })),
+                      );
+                      setPriceAuth(null);
+                    }}
+                  >
+                    Bloquear
+                  </Button>
+                }
+              />
+            )}
+
             <DataTable<CartItem>
               rowKey={(it) => it.product.id}
               columns={columns}
@@ -610,7 +724,7 @@ export function CajeroPage() {
                       </div>
                     ),
                   },
-                  { label: 'Precio unit.', value: moneyCell(it.unitPriceUsd) },
+                  { label: 'Precio unit.', value: priceCell(it) },
                   {
                     label: 'Subtotal',
                     value: moneyCell(round2(it.unitPriceUsd * it.quantity)),
@@ -863,6 +977,16 @@ export function CajeroPage() {
       >
         <ProductPreview productId={detailId} />
       </Modal>
+
+      <PriceAuthModal
+        open={authTarget != null}
+        productName={authTarget?.product.name}
+        onCancel={() => setAuthTarget(null)}
+        onAuthorized={(token, by) => {
+          setPriceAuth({ token, by });
+          setAuthTarget(null);
+        }}
+      />
     </div>
   );
 }

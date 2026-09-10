@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PAYMENT_METHODS } from '../constants/enums';
+import { securityPinSchema } from './auth';
 import { moneySchema, paginationSchema } from './common';
 
 export const saleDetailInputSchema = z.object({
@@ -37,6 +38,11 @@ export const createSaleSchema = z
     /** Fecha acordada de pago. Requerida en las ventas a crédito. */
     dueDate: dateOnlySchema.nullish(),
     details: z.array(saleDetailInputSchema).min(1, 'La venta necesita al menos un producto'),
+    /**
+     * Token de autorización de precio (`POST /sales/price-authorization`).
+     * Requerido solo si algún renglón lleva un precio distinto al de lista.
+     */
+    priceAuthToken: z.string().nullish(),
   })
   .superRefine((v, ctx) => {
     const issue = (path: string, message: string) =>
@@ -50,6 +56,17 @@ export const createSaleSchema = z
       issue('payments', 'Selecciona al menos un método de pago');
     }
   });
+
+/**
+ * Autorización para vender a un precio distinto al de lista: usuario con el
+ * permiso `sales:override_price` + su PIN. Devuelve un token de corta vida.
+ */
+export const priceAuthorizationSchema = z.object({
+  username: z.string().min(3).max(50),
+  pin: securityPinSchema,
+});
+
+export type PriceAuthorizationInput = z.infer<typeof priceAuthorizationSchema>;
 
 export const saleFiltersSchema = paginationSchema.extend({
   clientId: z.coerce.number().int().positive().optional(),

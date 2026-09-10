@@ -18,11 +18,17 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CreateProductInput, UpdateProductInput } from '@autopartes-air/shared';
-import { UNIVERSAL_CAR_ABBR, buildProductSku } from '@autopartes-air/shared';
+import {
+  UNIVERSAL_CAR_ABBR,
+  buildProductSku,
+  calcMarkupPct,
+  calcPriceUsd,
+  formatUsd,
+} from '@autopartes-air/shared';
 import { getApiErrorMessage } from '../../api/client';
 import { createBrand } from '../../api/catalogs.api';
 import { ProductImagesInput } from '../../components/ProductImagesInput';
-import { PercentInput, QuantityInput } from '../../components/NumberInputs';
+import { MoneyInput, PercentInput, QuantityInput } from '../../components/NumberInputs';
 import { categoryOptions } from '../../lib/categories';
 import { useBrands, useCategories } from '../../hooks/useCatalogs';
 import { useCarBrands, useCarModels } from '../../hooks/useCarBrands';
@@ -164,6 +170,46 @@ export function ProductFormPage() {
       form.setFieldsValue({ markupPct: 30, minStock: 0, description: FICHA_TEMPLATE });
     }
   }, [isEdit, form]);
+
+  /**
+   * Precio y margen son dos caras de lo mismo: el precio lo calcula la BD como
+   * ceil(costo × (1 + margen/100)), así que lo único que se guarda es el
+   * margen. En pantalla se editan los dos y cada uno recalcula al otro, porque
+   * nadie piensa "súbele 12,68 %": piensa "ahora vale 80".
+   */
+  const costUsd = Number(detail.data?.costUsd ?? 0);
+  const markupPct = Form.useWatch('markupPct', form) ?? 0;
+  const priceUsd = costUsd > 0 ? calcPriceUsd(costUsd, markupPct) : 0;
+
+  /**
+   * Lo que el usuario está tecleando en el campo de precio.
+   *
+   * Hace falta porque el precio que se muestra sale del margen, y el margen no
+   * baja de 0: al borrar dígitos para escribir otro número, el valor caía por
+   * debajo del costo y el campo saltaba de vuelta al costo, sin dejar escribir.
+   * Mientras se teclea manda el borrador; al salir del campo se muestra ya el
+   * precio real (redondeado al dólar y nunca por debajo del costo).
+   */
+  const [priceDraft, setPriceDraft] = useState<number | null>(null);
+
+  const onMarkupChange = (v: number | null) => {
+    setPriceDraft(null);
+    form.setFieldsValue({ markupPct: v ?? 0 });
+  };
+
+  const onPriceChange = (v: number | null) => {
+    if (costUsd <= 0) return;
+    setPriceDraft(v ?? 0);
+    form.setFieldsValue({ markupPct: calcMarkupPct(costUsd, v ?? 0) });
+  };
+
+  const onPriceBlur = () => {
+    // El piso es el costo: vender por debajo es perder en cada unidad.
+    if (priceDraft != null && priceDraft > 0 && priceDraft < costUsd) {
+      message.warning(`El precio no puede quedar por debajo del costo (${formatUsd(costUsd)}).`);
+    }
+    setPriceDraft(null);
+  };
 
   const categoryIds = Form.useWatch('categoryIds', form);
   const partNumber = Form.useWatch('partNumber', form);
@@ -467,19 +513,34 @@ export function ProductFormPage() {
         <Card title="Precio e inventario" style={{ marginBottom: 16 }}>
           <Row gutter={16}>
             <Col xs={24} md={8}>
+              <Form.Item label="Costo (última compra)">
+                <Input disabled value={costUsd > 0 ? formatUsd(costUsd) : 'Sin compras aún'} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
               <Form.Item
                 name="markupPct"
                 label="Margen de ganancia (%)"
                 rules={[{ required: true, message: 'Ingresa el margen' }]}
+                extra="Al cambiarlo se recalcula el precio."
               >
-                <PercentInput />
+                <PercentInput onChange={onMarkupChange} />
               </Form.Item>
             </Col>
-            <Col xs={24} md={16}>
-              <Form.Item label="Costo y precio de venta">
-                <Input
-                  disabled
-                  value="El costo se registra con la compra; el precio = costo + margen + IVA."
+            <Col xs={24} md={8}>
+              <Form.Item
+                label="Precio de venta (USD)"
+                extra={
+                  costUsd > 0
+                    ? 'Al cambiarlo se recalcula el margen. Se redondea al dólar entero.'
+                    : 'Se calcula al registrar la primera compra.'
+                }
+              >
+                <MoneyInput
+                  value={priceDraft ?? priceUsd}
+                  disabled={costUsd <= 0}
+                  onChange={onPriceChange}
+                  onBlur={onPriceBlur}
                 />
               </Form.Item>
             </Col>

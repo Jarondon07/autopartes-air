@@ -22,6 +22,7 @@ export const forbidden = (msg = 'No tiene permisos para esta acción', code = 'F
 export const notFound = (msg = 'Recurso no encontrado') =>
   new ApiError(404, 'NOT_FOUND', msg);
 export const conflict = (msg: string) => new ApiError(409, 'CONFLICT', msg);
+export const tooManyRequests = (msg: string) => new ApiError(429, 'TOO_MANY_REQUESTS', msg);
 
 export function errorHandler(
   err: unknown,

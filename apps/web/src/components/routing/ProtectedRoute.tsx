@@ -1,5 +1,5 @@
 import { Spin } from 'antd';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
 import { ForcePasswordChangePage } from '../../pages/ForcePasswordChangePage';
 
@@ -11,6 +11,7 @@ interface Props {
 /** Bloquea el acceso a rutas privadas si no hay sesión. */
 export function ProtectedRoute({ bootstrapping }: Props) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const location = useLocation();
   const mustChangePassword = useAuthStore((s) => s.user?.mustChangePassword ?? false);
 
   if (bootstrapping) {
@@ -29,7 +30,10 @@ export function ProtectedRoute({ bootstrapping }: Props) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    // Quien entra a la raíz sin sesión es, casi siempre, un cliente buscando un
+    // repuesto: se le muestra el catálogo, que ya tiene el botón de entrar. A
+    // una pantalla interna concreta sí se le manda al login.
+    return <Navigate to={location.pathname === '/' ? '/catalogo' : '/login'} replace />;
   }
 
   // Contraseña provisional: no se entra a ninguna ruta hasta cambiarla. Se

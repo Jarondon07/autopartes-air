@@ -45,6 +45,11 @@ export const users = pgTable('users', {
   isActive: boolean('is_active').notNull().default(true),
   /** Fuerza el cambio de contraseña en el próximo inicio de sesión. */
   mustChangePassword: boolean('must_change_password').notNull().default(false),
+  /**
+   * PIN de autorización (hash bcrypt), para avalar acciones puntuales en el
+   * mostrador sin teclear la contraseña. Nulo = el usuario aún no lo fijó.
+   */
+  securityPin: varchar('security_pin', { length: 100 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

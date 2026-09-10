@@ -58,6 +58,8 @@ export interface User {
 
 export interface AuthUser extends User {
   permissions: PermissionCode[];
+  /** Si ya fijó su PIN de autorización (el PIN en sí nunca sale del servidor). */
+  hasSecurityPin: boolean;
 }
 
 export interface LoginResponse {

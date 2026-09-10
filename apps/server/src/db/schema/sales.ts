@@ -71,6 +71,14 @@ export const saleDetails = pgTable(
     quantity: bigint('quantity', { mode: 'number' }).notNull(),
     unitPriceUsd: numeric('unit_price_usd', { precision: 14, scale: 2 }).notNull(),
     subtotalUsd: numeric('subtotal_usd', { precision: 14, scale: 2 }).notNull(),
+    /**
+     * Precio de lista al momento de vender. Solo se llena cuando el cajero
+     * vendió a otro precio: sin esto no hay forma de saber después cuánto se
+     * rebajó (o recargó) el renglón.
+     */
+    originalPriceUsd: numeric('original_price_usd', { precision: 14, scale: 2 }),
+    /** Usuario que avaló el precio distinto con su PIN. */
+    authorizedBy: integer('authorized_by').references(() => users.id),
   },
   (t) => [index('sale_details_sale_idx').on(t.saleId)],
 );
