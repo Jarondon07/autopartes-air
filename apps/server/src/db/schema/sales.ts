@@ -72,6 +72,15 @@ export const saleDetails = pgTable(
     unitPriceUsd: numeric('unit_price_usd', { precision: 14, scale: 2 }).notNull(),
     subtotalUsd: numeric('subtotal_usd', { precision: 14, scale: 2 }).notNull(),
     /**
+     * Costo del producto al momento de vender (foto, como `exchangeRate`).
+     *
+     * `products.costUsd` es el costo del ÚLTIMO lote y lo pisa cada compra: sin
+     * congelarlo aquí, la ganancia de una venta vieja se recalcularía con un
+     * costo que entró después. Null = venta anterior a esta columna; los
+     * reportes caen al costo actual del producto y la marcan como estimada.
+     */
+    unitCostUsd: numeric('unit_cost_usd', { precision: 14, scale: 2 }),
+    /**
      * Precio de lista al momento de vender. Solo se llena cuando el cajero
      * vendió a otro precio: sin esto no hay forma de saber después cuánto se
      * rebajó (o recargó) el renglón.

@@ -33,6 +33,30 @@ export function useSalesByPayment(p: Range, enabled = true) {
   });
 }
 
+export function usePurchasesSummary(p: Range, enabled = true) {
+  return useQuery({
+    queryKey: [KEY, 'purchases-summary', p],
+    queryFn: () => reportsApi.getPurchasesSummary(p),
+    enabled,
+  });
+}
+
+export function useSalesProfit(p: Range, enabled = true) {
+  return useQuery({
+    queryKey: [KEY, 'profit', p],
+    queryFn: () => reportsApi.getSalesProfit(p),
+    enabled,
+  });
+}
+
+export function useProfitByProduct(p: Range, enabled = true) {
+  return useQuery({
+    queryKey: [KEY, 'profit-by-product', p],
+    queryFn: () => reportsApi.getProfitByProduct(p),
+    enabled,
+  });
+}
+
 export function useInventorySummary(enabled = true) {
   return useQuery({
     queryKey: [KEY, 'inventory-summary'],

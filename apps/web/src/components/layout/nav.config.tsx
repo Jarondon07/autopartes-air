@@ -143,6 +143,7 @@ export const NAV_TREE: NavNode[] = [
     icon: <BarChartOutlined />,
     permission: [
       PERMISSIONS.REPORTS_SALES,
+      PERMISSIONS.REPORTS_PROFIT,
       PERMISSIONS.REPORTS_INVENTORY,
       PERMISSIONS.REPORTS_CASH,
       PERMISSIONS.REPORTS_ALL,

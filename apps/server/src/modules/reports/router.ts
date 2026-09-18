@@ -40,6 +40,46 @@ reportsRouter.get(
   },
 );
 
+// --- Inversión y ganancia (exponen costos: permiso propio) ---
+reportsRouter.get(
+  '/purchases/summary',
+  requirePermission(PERMISSIONS.REPORTS_PROFIT, PERMISSIONS.REPORTS_ALL),
+  validate(reportRangeSchema, 'query'),
+  async (req, res, next) => {
+    try {
+      ok(res, await service.purchasesSummary(asRange(req)));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+reportsRouter.get(
+  '/sales/profit',
+  requirePermission(PERMISSIONS.REPORTS_PROFIT, PERMISSIONS.REPORTS_ALL),
+  validate(reportRangeSchema, 'query'),
+  async (req, res, next) => {
+    try {
+      ok(res, await service.salesProfit(asRange(req)));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+reportsRouter.get(
+  '/sales/profit-by-product',
+  requirePermission(PERMISSIONS.REPORTS_PROFIT, PERMISSIONS.REPORTS_ALL),
+  validate(reportRangeSchema, 'query'),
+  async (req, res, next) => {
+    try {
+      ok(res, await service.profitByProduct(asRange(req)));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // --- Caja (cuadre por método de pago) ---
 reportsRouter.get(
   '/sales/by-payment',

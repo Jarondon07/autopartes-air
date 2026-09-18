@@ -78,6 +78,8 @@ export async function create(input: CreateSaleInput, userId: number) {
       unitPriceUsd: price,
       subtotalUsd: round2(d.quantity * price),
       originalPriceUsd: isOverride ? listPrice : null,
+      // Foto del costo: `products.costUsd` lo pisa la próxima compra.
+      unitCostUsd: round2(Number(prod.costUsd)),
     };
   });
 
@@ -139,6 +141,7 @@ export async function create(input: CreateSaleInput, userId: number) {
           quantity: d.quantity,
           unitPriceUsd: d.unitPriceUsd.toString(),
           subtotalUsd: d.subtotalUsd.toString(),
+          unitCostUsd: d.unitCostUsd.toString(),
           originalPriceUsd: d.originalPriceUsd?.toString() ?? null,
           authorizedBy: d.originalPriceUsd != null ? authorizer?.authorizerId ?? null : null,
         });

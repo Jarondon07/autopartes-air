@@ -1,14 +1,23 @@
 import { useMemo, useState } from 'react';
-import { Card, Col, DatePicker, Progress, Row, Statistic, Table, Typography } from 'antd';
+import { Alert, Card, Col, DatePicker, Progress, Row, Statistic, Table, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { type Dayjs } from 'dayjs';
 import { PAYMENT_METHOD_LABELS, PERMISSIONS, formatUsd } from '@autopartes-air/shared';
 import type { PaymentMethod } from '@autopartes-air/shared';
-import type { PaymentRow, SalesDailyRow, TopProductRow } from '../../api/reports.api';
+import type {
+  PaymentRow,
+  ProfitProductRow,
+  SalesDailyRow,
+  SupplierSpendRow,
+  TopProductRow,
+} from '../../api/reports.api';
 import {
   useInventorySummary,
+  useProfitByProduct,
+  usePurchasesSummary,
   useSalesByPayment,
   useSalesDaily,
+  useSalesProfit,
   useTopProducts,
 } from '../../hooks/useReports';
 import { useAuthStore } from '../../stores/auth.store';
@@ -27,6 +36,7 @@ export function ReportsPage() {
   const canSales = canAll || hasPermission(PERMISSIONS.REPORTS_SALES);
   const canCash = canAll || hasPermission(PERMISSIONS.REPORTS_CASH);
   const canInv = canAll || hasPermission(PERMISSIONS.REPORTS_INVENTORY);
+  const canProfit = canAll || hasPermission(PERMISSIONS.REPORTS_PROFIT);
 
   const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf('month'), dayjs()]);
   const from = range[0].format('YYYY-MM-DD');
@@ -36,6 +46,9 @@ export function ReportsPage() {
   const topProducts = useTopProducts({ from, to, limit: 10 }, canSales);
   const byPayment = useSalesByPayment({ from, to }, canCash);
   const inventory = useInventorySummary(canInv);
+  const invested = usePurchasesSummary({ from, to }, canProfit);
+  const profit = useSalesProfit({ from, to }, canProfit);
+  const profitProducts = useProfitByProduct({ from, to, limit: 10 }, canProfit);
 
   const dailyRows = daily.data ?? [];
   const totals = useMemo(
@@ -82,6 +95,42 @@ export function ReportsPage() {
     },
   ];
 
+  const supplierColumns: ColumnsType<SupplierSpendRow> = [
+    { title: 'Proveedor', dataIndex: 'supplierName' },
+    { title: 'Compras', dataIndex: 'count', width: 90, align: 'right' },
+    { title: 'Unid.', dataIndex: 'units', width: 90, align: 'right' },
+    {
+      title: 'Invertido (USD)',
+      dataIndex: 'totalUsd',
+      width: 140,
+      align: 'right',
+      render: (v: number) => <Text strong>{formatUsd(v)}</Text>,
+    },
+  ];
+
+  const profitProductColumns: ColumnsType<ProfitProductRow> = [
+    { title: 'Producto', key: 'p', render: (_, r) => `${r.code} — ${r.name}` },
+    { title: 'Cant.', dataIndex: 'quantity', width: 80, align: 'right' },
+    {
+      title: 'Venta (USD)',
+      dataIndex: 'revenueUsd',
+      width: 120,
+      align: 'right',
+      render: (v: number) => formatUsd(v),
+    },
+    {
+      title: 'Ganancia (USD)',
+      dataIndex: 'profitUsd',
+      width: 140,
+      align: 'right',
+      render: (v: number) => (
+        <Text strong type={v < 0 ? 'danger' : 'success'}>
+          {formatUsd(v)}
+        </Text>
+      ),
+    },
+  ];
+
   const paymentColumns: ColumnsType<PaymentRow> = [
     {
       title: 'Método',
@@ -111,7 +160,7 @@ export function ReportsPage() {
           <Title level={3} style={{ margin: 0 }}>
             <strong>Reportes</strong>
           </Title>
-          <Text type="secondary">Ventas, caja e inventario</Text>
+          <Text type="secondary">Ventas, ganancia, caja e inventario</Text>
         </Col>
         <Col>
           <RangePicker
@@ -157,7 +206,97 @@ export function ReportsPage() {
         </Row>
       )}
 
+      {canProfit && (
+        <>
+          <Row gutter={[24, 24]} style={{ marginBottom: 8 }}>
+            <Col xs={24} sm={12} xl={6}>
+              <Card loading={invested.isLoading}>
+                <Statistic
+                  title="Invertido en compras (USD)"
+                  value={formatUsd(invested.data?.totalUsd ?? 0)}
+                />
+                <Text type="secondary">{invested.data?.count ?? 0} compra(s) en el rango</Text>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} xl={6}>
+              <Card loading={profit.isLoading}>
+                <Statistic
+                  title="Costo de lo vendido (USD)"
+                  value={formatUsd(profit.data?.costUsd ?? 0)}
+                />
+                <Text type="secondary">
+                  Venta sin IVA: {formatUsd(profit.data?.revenueUsd ?? 0)}
+                </Text>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} xl={6}>
+              <Card loading={profit.isLoading}>
+                <Statistic
+                  title="Ganancia bruta (USD)"
+                  value={formatUsd(profit.data?.profitUsd ?? 0)}
+                  valueStyle={{ color: (profit.data?.profitUsd ?? 0) < 0 ? '#cf1322' : '#3f8600' }}
+                />
+                <Text type="secondary">Sin descontar gastos del negocio</Text>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} xl={6}>
+              <Card loading={profit.isLoading}>
+                <Statistic
+                  title="Margen sobre la venta"
+                  value={(profit.data?.marginPct ?? 0).toFixed(2).replace('.', ',')}
+                  suffix="%"
+                />
+                <Text type="secondary">Cuánto queda de cada dólar facturado</Text>
+              </Card>
+            </Col>
+          </Row>
+
+          {(profit.data?.estimatedLines ?? 0) > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Parte de la ganancia es estimada"
+              description={`${profit.data?.estimatedLines} de ${profit.data?.lines} renglones del rango son de ventas anteriores al registro del costo, y se calcularon con el costo actual del producto. Si ese costo cambió desde entonces, la ganancia de esas líneas no es exacta.`}
+            />
+          )}
+        </>
+      )}
+
       <Row gutter={[24, 24]}>
+        {canProfit && (
+          <>
+            <Col xs={24} xl={14}>
+              <Card title="Inversión por proveedor">
+                <Table<SupplierSpendRow>
+                  scroll={{ x: 'max-content' }}
+                  rowKey="supplierId"
+                  size="small"
+                  columns={supplierColumns}
+                  dataSource={invested.data?.bySupplier ?? []}
+                  loading={invested.isLoading}
+                  pagination={false}
+                  locale={{ emptyText: 'Sin compras en el rango' }}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} xl={10}>
+              <Card title="Productos más rentables">
+                <Table<ProfitProductRow>
+                  scroll={{ x: 'max-content', y: 320 }}
+                  rowKey="productId"
+                  size="small"
+                  columns={profitProductColumns}
+                  dataSource={profitProducts.data ?? []}
+                  loading={profitProducts.isLoading}
+                  pagination={false}
+                  locale={{ emptyText: 'Sin datos' }}
+                />
+              </Card>
+            </Col>
+          </>
+        )}
+
         {canSales && (
           <>
             <Col xs={24} xl={14}>

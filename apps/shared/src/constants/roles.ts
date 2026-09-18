@@ -66,6 +66,12 @@ export const PERMISSIONS = {
 
   // Reportes
   REPORTS_SALES: 'reports:sales',
+  /**
+   * Inversión (compras) y ganancia. Aparte de `reports:sales` porque expone
+   * los costos: quien ve cuánto se vendió no necesariamente puede ver cuánto
+   * se pagó por la mercancía ni cuánto se gana con ella.
+   */
+  REPORTS_PROFIT: 'reports:profit',
   REPORTS_INVENTORY: 'reports:inventory',
   REPORTS_CASH: 'reports:cash',
   REPORTS_ALL: 'reports:all',

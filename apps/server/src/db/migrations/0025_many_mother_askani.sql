@@ -1,0 +1,1 @@
+ALTER TABLE "sale_details" ADD COLUMN "unit_cost_usd" numeric(14, 2);
