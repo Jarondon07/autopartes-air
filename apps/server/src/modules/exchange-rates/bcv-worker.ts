@@ -5,10 +5,9 @@
  * Prisma, corre como un job in-process en el server (setInterval) usando Drizzle
  * y nuestra tabla `exchange_rates`.
  *
- * Cada ciclo hace UNA consulta a Radar y hace UPSERT de las 4 tasas del día:
+ * Cada ciclo hace UNA consulta a Radar y hace UPSERT de las 3 tasas del día:
  *   - bcv          → Radar source "bcv",                    USD/VES
  *   - euro         → Radar source "bcv",                    EUR/VES
- *   - intervencion → Radar source "intervencion_cambiaria", USD/VES
  *   - usdt         → Radar source "binance_p2p",            USDT/VES
  *
  * Las tasas automáticas se guardan con `createdBy = null` (las manuales llevan
@@ -36,7 +35,6 @@ const RADAR_MAP: {
 }[] = [
   { source: 'bcv', radarSource: 'bcv', base: 'USD' },
   { source: 'euro', radarSource: 'bcv', base: 'EUR' },
-  { source: 'intervencion', radarSource: 'intervencion_cambiaria', base: 'USD' },
   { source: 'usdt', radarSource: 'binance_p2p', base: 'USDT' },
 ];
 
@@ -49,8 +47,19 @@ function todayLocal(): string {
 
 /** Consulta Radar y devuelve el array de tasas (tolera { rates } o array plano). */
 async function fetchRadarRates(): Promise<RadarRate[]> {
+  // Garantizado por la validación de entorno (URL exigida junto con la clave);
+  // el guard existe para que el tipo sea `string` y no un `!` a ciegas.
+  if (!env.RADAR_API_URL) throw new Error('Falta RADAR_API_URL en el .env');
+
   const res = await fetch(env.RADAR_API_URL, {
-    headers: { Authorization: `Bearer ${env.RADAR_API_KEY}` },
+    // Radar acepta la clave en `x-api-key` o en `Authorization: Bearer`, pero
+    // usamos el header propio a propósito: si el proveedor vuelve a mover el
+    // dominio, `fetch` sigue el 3xx y **borra `Authorization`** al cambiar de
+    // origen (protección de undici para no filtrar credenciales a terceros),
+    // mientras que un header personalizado sobrevive. Pasó el 22/09/2026:
+    // radar.revolut.team empezó a redirigir a radar.evolut.team y el worker
+    // llevaba dos días recibiendo 401 con una clave perfectamente válida.
+    headers: { 'x-api-key': env.RADAR_API_KEY },
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`Radar respondió ${res.status}`);
@@ -95,7 +104,7 @@ async function upsertRate(source: ExchangeRateSource, rate: number): Promise<boo
 }
 
 /**
- * Consulta Radar y actualiza las 4 tasas del día. Devuelve qué fuentes cambiaron.
+ * Consulta Radar y actualiza las 3 tasas del día. Devuelve qué fuentes cambiaron.
  * Propaga errores (lo usa el endpoint manual "Actualizar ahora").
  */
 export async function runRatesFetch(): Promise<{ updated: string[] }> {

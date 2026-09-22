@@ -113,7 +113,7 @@ JWT_REFRESH_SECRET=<32 bytes hex nuevos>
 JWT_ACCESS_TTL=15m
 JWT_REFRESH_TTL=7d
 
-RADAR_API_URL=https://radar.revolut.team/api/rates
+RADAR_API_URL=https://radar.evolut.team/api/rates
 RADAR_API_KEY=<clave real, o vacío para tasas solo manuales>
 BCV_FETCH_TIME=00:30
 BCV_FALLBACK_RATE=36

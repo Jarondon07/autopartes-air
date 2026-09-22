@@ -39,18 +39,17 @@ export const PAYMENT_METHODS_BY_CURRENCY: { currency: 'USD' | 'BS'; methods: Pay
 export const DOCUMENT_TYPES = ['V', 'J', 'E', 'P', 'G'] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
-export const EXCHANGE_RATE_SOURCES = [
-  'bcv',
-  'euro',
-  'intervencion',
-  'usdt',
-] as const;
+/**
+ * Fuentes de tasa. `intervencion` se eliminó en sep. 2026: Radar dejó de
+ * publicarla (la última quedó congelada el 13/08/2026) y una tasa que no se
+ * actualiza miente más de lo que informa.
+ */
+export const EXCHANGE_RATE_SOURCES = ['bcv', 'euro', 'usdt'] as const;
 export type ExchangeRateSource = (typeof EXCHANGE_RATE_SOURCES)[number];
 
 export const EXCHANGE_RATE_SOURCE_LABELS: Record<ExchangeRateSource, string> = {
   bcv: 'BCV (USD)',
   euro: 'Euro (BCV)',
-  intervencion: 'Intervención',
   usdt: 'USDT (Paralelo)',
 };
 

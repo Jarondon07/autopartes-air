@@ -22,7 +22,6 @@ const { Title, Text } = Typography;
 const SOURCE_COLOR: Record<string, string> = {
   bcv: 'blue',
   euro: 'purple',
-  intervencion: 'cyan',
   usdt: 'gold',
 };
 

@@ -41,7 +41,12 @@ const envSchema = z.object({
 
   // --- Worker de tasa BCV automática ---
   // Si RADAR_API_KEY está vacío, el worker no se activa (solo tasa manual).
-  RADAR_API_URL: z.string().default('https://radar.revolut.team/api/rates'),
+  //
+  // La URL NO lleva valor por defecto a propósito: el endpoint del proveedor es
+  // configuración de despliegue y vive en el `.env`, no incrustado en el código.
+  // Cuando Radar movió su dominio (sep. 2026) hubo que tocar un solo archivo
+  // por entorno; un default en el código habría tapado el `.env` desactualizado.
+  RADAR_API_URL: z.string().url('RADAR_API_URL debe ser una URL válida').optional(),
   RADAR_API_KEY: z.string().default(''),
   /** Hora local (HH:MM) de la consulta diaria automática a Radar. */
   BCV_FETCH_TIME: z
@@ -52,7 +57,23 @@ const envSchema = z.object({
   BCV_FALLBACK_RATE: z.coerce.number().positive().default(36),
 });
 
-const parsed = envSchema.safeParse(process.env);
+/**
+ * La URL de Radar solo hace falta si el worker va a correr. Se exige junto con
+ * la clave (y no siempre) para que un entorno sin tasas automáticas arranque
+ * igual, pero uno con clave y sin URL falle al arrancar y no en la primera
+ * consulta del día.
+ */
+const envSchemaChecked = envSchema.superRefine((v, ctx) => {
+  if (v.RADAR_API_KEY && !v.RADAR_API_URL) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['RADAR_API_URL'],
+      message: 'Requerida cuando hay RADAR_API_KEY (defínela en el .env)',
+    });
+  }
+});
+
+const parsed = envSchemaChecked.safeParse(process.env);
 
 if (!parsed.success) {
   console.error(`❌ Variables de entorno inválidas (archivo: ${envFile}):`);
