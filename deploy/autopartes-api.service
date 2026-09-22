@@ -1,0 +1,32 @@
+# Copiar a /etc/systemd/system/autopartes-api.service
+[Unit]
+Description=AutoparteAIR API
+Documentation=https://github.com/Jarondon07/autopartes-air
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=autopartes
+Group=autopartes
+# Debe ser apps/server: infra/env.ts carga `.env` relativo al cwd
+# y lib/upload.ts resuelve `uploads/` también contra el cwd.
+WorkingDirectory=/srv/autopartes-air/apps/server
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autopartes-api
+
+# Endurecimiento
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/srv/autopartes-air/apps/server/uploads
+
+[Install]
+WantedBy=multi-user.target

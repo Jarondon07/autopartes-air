@@ -55,6 +55,16 @@ api.interceptors.response.use(
 
     const isAuthEndpoint = original?.url?.includes('/auth/');
 
+    // Contraseña provisional: el servidor rechaza todo lo demás hasta cambiarla.
+    // Se marca en el store para que la app muestre la pantalla de cambio en vez
+    // de una cascada de errores sueltos.
+    if (
+      error.response?.status === 403 &&
+      error.response.data?.error?.code === 'PASSWORD_CHANGE_REQUIRED'
+    ) {
+      useAuthStore.getState().markMustChangePassword();
+    }
+
     if (error.response?.status === 401 && original && !original._retry && !isAuthEndpoint) {
       original._retry = true;
       // Un único refresh compartido entre peticiones concurrentes.

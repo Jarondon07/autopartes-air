@@ -1,0 +1,9 @@
+# Cliente de escritorio AutoparteAIR — dependencias base
+PySide6>=6.7
+requests>=2.31
+
+# --- Hardware de punto de venta (instalar cuando se integre) ---
+# python-escpos>=3.1   # impresora térmica de recibos (ESC/POS) y pulso de gaveta
+# pyusb>=1.2           # impresoras/gavetas conectadas por USB
+# El lector de código de barras normalmente actúa como teclado (HID):
+# no requiere librería, "escribe" el código en el campo de búsqueda.

@@ -22,6 +22,14 @@ export function useProducts(filters: Partial<ProductFilters>) {
   });
 }
 
+/** Productos con stock bajo (para el dashboard). */
+export function useLowStock() {
+  return useQuery({
+    queryKey: [KEY, 'low-stock'],
+    queryFn: productsApi.getLowStock,
+  });
+}
+
 /** Detalle de un producto (incluye vehículos compatibles). */
 export function useProduct(id: number | null) {
   return useQuery({

@@ -5,6 +5,8 @@ export const purchaseDetailInputSchema = z.object({
   productId: z.number().int().positive(),
   quantity: z.number().int().positive(),
   unitCostUsd: moneySchema,
+  /** Margen de ganancia (%) a fijar en el producto con esta compra. Opcional. */
+  markupPct: z.coerce.number().min(0).max(999.99).optional(),
 });
 
 export const createPurchaseSchema = z.object({

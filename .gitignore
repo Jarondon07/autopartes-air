@@ -6,3 +6,6 @@ build/
 *.log
 .DS_Store
 coverage/
+# Solo los archivos subidos en runtime; anclado para no ignorar
+# apps/server/src/modules/uploads/ (código fuente del módulo).
+/apps/server/uploads/

@@ -47,11 +47,19 @@ export interface User {
   roleId: number;
   roleName: RoleName;
   isActive: boolean;
+  /**
+   * El usuario debe cambiar su contraseña antes de poder usar el sistema.
+   * Se activa al crear el usuario y al resetearle la contraseña desde
+   * Configuración; se apaga cuando el propio usuario la cambia.
+   */
+  mustChangePassword: boolean;
   createdAt: string;
 }
 
 export interface AuthUser extends User {
   permissions: PermissionCode[];
+  /** Si ya fijó su PIN de autorización (el PIN en sí nunca sale del servidor). */
+  hasSecurityPin: boolean;
 }
 
 export interface LoginResponse {
@@ -62,12 +70,46 @@ export interface LoginResponse {
 export interface Category {
   id: number;
   name: string;
+  abbreviation: string | null;
   description: string | null;
+  isActive: boolean;
 }
 
 export interface Brand {
   id: number;
   name: string;
+}
+
+export interface Tax {
+  id: number;
+  name: string;
+  rate: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface Warehouse {
+  id: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CarBrand {
+  id: number;
+  name: string;
+  abbreviation: string | null;
+  logoUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CarModel {
+  id: number;
+  brandId: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export interface Vehicle {
@@ -81,19 +123,32 @@ export interface Vehicle {
 export interface Product {
   id: number;
   code: string;
+  partNumber: string;
   name: string;
+  shortDescription: string | null;
   description: string | null;
   categoryId: number | null;
   brandId: number | null;
+  carBrandId: number | null;
+  /** Sirve para cualquier vehículo: sin marca ni modelos de carro. */
+  isUniversal: boolean;
   costUsd: string;
   markupPct: string;
   priceUsd: string;
   stock: number;
   minStock: number;
-  location: string | null;
+  warehouseId: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Modelo de carro compatible con un producto, con su rango de años y nombre para mostrar. */
+export interface ProductCarModelLink {
+  carModelId: number;
+  name: string;
+  yearFrom: number | null;
+  yearTo: number | null;
 }
 
 export interface ExchangeRate {
@@ -159,6 +214,60 @@ export interface SaleDetail {
   subtotalUsd: string;
 }
 
+export interface SalePayment {
+  method: PaymentMethod;
+  amountUsd: string;
+  amountBs: string;
+}
+
+/**
+ * Un pago de la venta con su momento y tasa. Los pagos del mostrador y los
+ * abonos posteriores de una deuda son la misma cosa: filas de `sale_payments`
+ * en distinta fecha.
+ */
+export interface SalePaymentRow extends SalePayment {
+  id: number;
+  saleId: number;
+  paidAt: string;
+  /** Tasa usada para convertir a Bs (null en métodos que se cobran en USD). */
+  exchangeRate: string | null;
+  userId: number | null;
+  notes: string | null;
+}
+
+/** Estado de una deuda; se deriva del saldo y la fecha de pago, no se guarda. */
+export const DEBT_STATUSES = ['pendiente', 'parcial', 'vencida', 'pagada'] as const;
+export type DebtStatus = (typeof DEBT_STATUSES)[number];
+
+/** Una venta a crédito con lo abonado y lo que falta. */
+export interface DebtRow {
+  saleId: number;
+  clientId: number | null;
+  clientName: string | null;
+  saleDate: string;
+  dueDate: string | null;
+  totalUsd: string;
+  paidUsd: string;
+  balanceUsd: string;
+  status: DebtStatus;
+  /** Días de atraso (0 si no está vencida). */
+  daysOverdue: number;
+}
+
+export interface DebtDetail extends DebtRow {
+  payments: SalePaymentRow[];
+  details: SaleDetail[];
+  notes: string | null;
+}
+
+/** Agregados de cuentas por cobrar (dashboard). */
+export interface DebtsSummary {
+  count: number;
+  totalBalanceUsd: string;
+  overdueCount: number;
+  overdueBalanceUsd: string;
+}
+
 export interface Sale {
   id: number;
   clientId: number | null;
@@ -170,7 +279,11 @@ export interface Sale {
   ivaUsd: string;
   totalUsd: string;
   totalBs: string;
-  paymentMethod: PaymentMethod;
+  paymentMethods: PaymentMethod[];
+  /** Venta a crédito: se entregó la mercancía y el pago queda pendiente. */
+  isCredit: boolean;
+  /** Fecha acordada de pago (`YYYY-MM-DD`). Null en ventas de contado. */
+  dueDate: string | null;
   status: SaleStatus;
   voidedAt: string | null;
   voidedBy: number | null;

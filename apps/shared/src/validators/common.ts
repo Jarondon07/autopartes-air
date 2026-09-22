@@ -15,8 +15,8 @@ export const moneySchema = z.coerce
   .nonnegative()
   .multipleOf(0.01, 'Máximo 2 decimales');
 
-/** Tasa de cambio: hasta 4 decimales, positiva. */
+/** Tasa de cambio: hasta 2 decimales, positiva. */
 export const rateSchema = z.coerce
   .number()
   .positive()
-  .multipleOf(0.0001, 'Máximo 4 decimales');
+  .multipleOf(0.01, 'Máximo 2 decimales');

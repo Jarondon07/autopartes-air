@@ -5,7 +5,7 @@ import { categories } from '../../db/schema';
 import { notFound } from '../../middleware/error';
 import { withForeignKeyGuard, withUniqueGuard } from '../../lib/db-errors';
 
-const DUP = 'Ya existe una categoría con ese nombre';
+const DUP = 'Ya existe una categoría con ese nombre o código';
 const IN_USE = 'No se puede eliminar: la categoría tiene productos asociados';
 
 export function list() {

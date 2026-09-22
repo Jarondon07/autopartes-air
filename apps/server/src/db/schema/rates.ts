@@ -16,7 +16,7 @@ export const exchangeRates = pgTable(
     id: serial('id').primaryKey(),
     rateDate: date('rate_date').notNull(),
     source: exchangeRateSourceEnum('source').notNull(),
-    rateBsPerUsd: numeric('rate_bs_per_usd', { precision: 14, scale: 4 }).notNull(),
+    rateBsPerUsd: numeric('rate_bs_per_usd', { precision: 14, scale: 2 }).notNull(),
     createdBy: integer('created_by').references(() => users.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

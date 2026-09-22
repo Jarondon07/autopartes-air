@@ -2,18 +2,26 @@ import type {
   ApiSuccess,
   CreateProductInput,
   Product,
+  ProductCarModelLink,
   ProductFilters,
   UpdateProductInput,
 } from '@autopartes-air/shared';
 import { api } from './client';
 
-/** Producto con sus vehículos compatibles (respuesta de detalle). */
+/** Producto con sus categorías, modelos de carro compatibles (con años) e imágenes. */
 export interface ProductDetail extends Product {
-  vehicleIds: number[];
+  categoryIds: number[];
+  carModels: ProductCarModelLink[];
+  images: string[];
+}
+
+/** Fila de la lista de productos, con miniatura (imagen principal). */
+export interface ProductRow extends Product {
+  primaryImageUrl: string | null;
 }
 
 export interface ProductsPage {
-  data: Product[];
+  data: ProductRow[];
   meta: { page: number; limit: number; total: number };
 }
 
@@ -21,7 +29,7 @@ export interface ProductsPage {
 export async function listProducts(
   filters: Partial<ProductFilters>,
 ): Promise<ProductsPage> {
-  const { data } = await api.get<ApiSuccess<Product[]>>('/products', {
+  const { data } = await api.get<ApiSuccess<ProductRow[]>>('/products', {
     params: filters,
   });
   return {
@@ -54,4 +62,10 @@ export async function updateProduct(
 /** DELETE /products/:id — baja lógica (isActive = false). */
 export async function deleteProduct(id: number): Promise<void> {
   await api.delete(`/products/${id}`);
+}
+
+/** GET /products/low-stock — productos activos con stock ≤ stock mínimo. */
+export async function getLowStock(): Promise<Product[]> {
+  const { data } = await api.get<ApiSuccess<Product[]>>('/products/low-stock');
+  return data.data;
 }

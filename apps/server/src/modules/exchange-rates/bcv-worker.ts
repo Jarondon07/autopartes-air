@@ -1,0 +1,163 @@
+/**
+ * Worker de tasas automáticas (Radar → PostgreSQL).
+ *
+ * Adaptación del sistema documentado: en lugar de un contenedor Docker con
+ * Prisma, corre como un job in-process en el server (setInterval) usando Drizzle
+ * y nuestra tabla `exchange_rates`.
+ *
+ * Cada ciclo hace UNA consulta a Radar y hace UPSERT de las 3 tasas del día:
+ *   - bcv          → Radar source "bcv",                    USD/VES
+ *   - euro         → Radar source "bcv",                    EUR/VES
+ *   - usdt         → Radar source "binance_p2p",            USDT/VES
+ *
+ * Las tasas automáticas se guardan con `createdBy = null` (las manuales llevan
+ * el id del usuario). Es resiliente: los errores se registran y se reintentan.
+ */
+
+import { and, eq } from 'drizzle-orm';
+import type { ExchangeRateSource } from '@autopartes-air/shared';
+import { db } from '../../infra/db';
+import { exchangeRates } from '../../db/schema';
+import { env } from '../../infra/env';
+
+interface RadarRate {
+  source?: string;
+  baseCurrency?: string;
+  quoteCurrency?: string;
+  midRate?: string | number;
+}
+
+/** Mapeo de cada fuente nuestra a su entrada en la respuesta de Radar. */
+const RADAR_MAP: {
+  source: ExchangeRateSource;
+  radarSource: string;
+  base: string;
+}[] = [
+  { source: 'bcv', radarSource: 'bcv', base: 'USD' },
+  { source: 'euro', radarSource: 'bcv', base: 'EUR' },
+  { source: 'usdt', radarSource: 'binance_p2p', base: 'USDT' },
+];
+
+/** Fecha local en formato YYYY-MM-DD (evita el corrimiento de UTC). */
+function todayLocal(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Consulta Radar y devuelve el array de tasas (tolera { rates } o array plano). */
+async function fetchRadarRates(): Promise<RadarRate[]> {
+  // Garantizado por la validación de entorno (URL exigida junto con la clave);
+  // el guard existe para que el tipo sea `string` y no un `!` a ciegas.
+  if (!env.RADAR_API_URL) throw new Error('Falta RADAR_API_URL en el .env');
+
+  const res = await fetch(env.RADAR_API_URL, {
+    // Radar acepta la clave en `x-api-key` o en `Authorization: Bearer`, pero
+    // usamos el header propio a propósito: si el proveedor vuelve a mover el
+    // dominio, `fetch` sigue el 3xx y **borra `Authorization`** al cambiar de
+    // origen (protección de undici para no filtrar credenciales a terceros),
+    // mientras que un header personalizado sobrevive. Pasó el 22/09/2026:
+    // radar.revolut.team empezó a redirigir a radar.evolut.team y el worker
+    // llevaba dos días recibiendo 401 con una clave perfectamente válida.
+    headers: { 'x-api-key': env.RADAR_API_KEY },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`Radar respondió ${res.status}`);
+
+  const data: unknown = await res.json();
+  if (Array.isArray(data)) return data as RadarRate[];
+  const rates = (data as { rates?: unknown })?.rates;
+  return Array.isArray(rates) ? (rates as RadarRate[]) : [];
+}
+
+/** Extrae una tasa (VES) del array de Radar por fuente y moneda base. */
+function extractRate(rates: RadarRate[], radarSource: string, base: string): number | null {
+  const entry = rates.find(
+    (r) => r.source === radarSource && r.baseCurrency === base && r.quoteCurrency === 'VES',
+  );
+  if (!entry) return null;
+  const mid =
+    typeof entry.midRate === 'string' ? Number.parseFloat(entry.midRate) : entry.midRate;
+  return typeof mid === 'number' && Number.isFinite(mid)
+    ? Math.round(mid * 100) / 100 // tasas a 2 decimales
+    : null;
+}
+
+/** UPSERT de la tasa del día para una fuente; devuelve true si cambió. */
+async function upsertRate(source: ExchangeRateSource, rate: number): Promise<boolean> {
+  const rateDate = todayLocal();
+  const [current] = await db
+    .select()
+    .from(exchangeRates)
+    .where(and(eq(exchangeRates.rateDate, rateDate), eq(exchangeRates.source, source)));
+
+  if (current && Number(current.rateBsPerUsd) === rate) return false; // sin cambios
+
+  await db
+    .insert(exchangeRates)
+    .values({ rateDate, source, rateBsPerUsd: rate.toString(), createdBy: null })
+    .onConflictDoUpdate({
+      target: [exchangeRates.rateDate, exchangeRates.source],
+      set: { rateBsPerUsd: rate.toString(), createdBy: null, createdAt: new Date() },
+    });
+  return true;
+}
+
+/**
+ * Consulta Radar y actualiza las 3 tasas del día. Devuelve qué fuentes cambiaron.
+ * Propaga errores (lo usa el endpoint manual "Actualizar ahora").
+ */
+export async function runRatesFetch(): Promise<{ updated: string[] }> {
+  const rates = await fetchRadarRates();
+  const updated: string[] = [];
+
+  for (const { source, radarSource, base } of RADAR_MAP) {
+    const rate = extractRate(rates, radarSource, base);
+    if (rate == null) {
+      console.warn(`[tasas] Radar no devolvió ${source} (${base}/VES).`);
+      continue;
+    }
+    if (await upsertRate(source, rate)) updated.push(`${source}=${rate}`);
+  }
+
+  if (updated.length) console.log(`[tasas] Actualizadas: ${updated.join(', ')}.`);
+  return { updated };
+}
+
+/** Un ciclo del job programado: como runRatesFetch pero sin propagar errores. */
+export async function fetchRatesJob(): Promise<void> {
+  try {
+    await runRatesFetch();
+  } catch (err) {
+    console.error('[tasas] Error al consultar Radar:', err instanceof Error ? err.message : err);
+  }
+}
+
+/** Milisegundos hasta la próxima ocurrencia local de HH:MM. */
+function msUntil(timeHHMM: string): number {
+  const [h, m] = timeHHMM.split(':').map(Number);
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(h ?? 0, m ?? 0, 0, 0);
+  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+/** Programa la consulta para la próxima HH:MM y se reprograma cada día. */
+function scheduleDaily(timeHHMM: string): void {
+  setTimeout(() => {
+    void fetchRatesJob();
+    scheduleDaily(timeHHMM); // reprograma para el día siguiente (recalcula, tolera DST)
+  }, msUntil(timeHHMM));
+}
+
+/** Arranca el worker si hay RADAR_API_KEY; si no, queda solo la carga manual. */
+export function startRatesWorker(): void {
+  if (!env.RADAR_API_KEY) {
+    console.log('ℹ️  Worker de tasas deshabilitado (define RADAR_API_KEY para activarlo).');
+    return;
+  }
+  console.log(`🔄 Worker de tasas activo: consulta diaria a las ${env.BCV_FETCH_TIME}.`);
+  void fetchRatesJob(); // una consulta al arrancar para tener datos frescos
+  scheduleDaily(env.BCV_FETCH_TIME);
+}

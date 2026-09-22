@@ -1,11 +1,15 @@
 import { and, desc, eq, sql, type SQL } from 'drizzle-orm';
-import type {
-  CreateExchangeRateInput,
-  ExchangeRateSource,
+import {
+  EXCHANGE_RATE_SOURCES,
+  type CreateExchangeRateInput,
+  type ExchangeRateSource,
 } from '@autopartes-air/shared';
 import { db } from '../../infra/db';
 import { exchangeRates } from '../../db/schema';
+import { env } from '../../infra/env';
+import { badRequest } from '../../middleware/error';
 import { withUniqueGuard } from '../../lib/db-errors';
+import { runRatesFetch } from './bcv-worker';
 
 const DUP = 'Ya existe una tasa registrada para esa fecha y fuente';
 
@@ -19,13 +23,26 @@ async function latestForSource(source: ExchangeRateSource) {
   return row ?? null;
 }
 
-/** Última tasa vigente para cada fuente (BCV y paralelo). */
+/** Última tasa vigente para cada una de las fuentes configuradas. */
 export async function current() {
-  const [bcv, paralelo] = await Promise.all([
-    latestForSource('bcv'),
-    latestForSource('paralelo'),
-  ]);
-  return { bcv, paralelo };
+  const entries = await Promise.all(
+    EXCHANGE_RATE_SOURCES.map(
+      async (source) => [source, await latestForSource(source)] as const,
+    ),
+  );
+  return Object.fromEntries(entries) as Record<
+    ExchangeRateSource,
+    Awaited<ReturnType<typeof latestForSource>>
+  >;
+}
+
+/**
+ * Tasa BCV vigente como número, con fallback de emergencia si no hay ninguna
+ * registrada (útil para cálculos de ventas/compras). Ver BCV_FALLBACK_RATE.
+ */
+export async function getBcvRate(): Promise<number> {
+  const row = await latestForSource('bcv');
+  return row ? Number(row.rateBsPerUsd) : env.BCV_FALLBACK_RATE;
 }
 
 interface ListParams {
@@ -67,4 +84,13 @@ export function create(input: CreateExchangeRateInput, userId: number) {
       .returning();
     return row;
   });
+}
+
+/** Consulta Radar en el momento (botón "Actualizar ahora") y devuelve las tasas vigentes. */
+export async function refresh() {
+  if (!env.RADAR_API_KEY) {
+    throw badRequest('El worker de tasas no está configurado (falta RADAR_API_KEY).');
+  }
+  const { updated } = await runRatesFetch();
+  return { updated, current: await current() };
 }

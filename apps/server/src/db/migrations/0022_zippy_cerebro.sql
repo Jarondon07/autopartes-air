@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "is_universal" boolean DEFAULT false NOT NULL;

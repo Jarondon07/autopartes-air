@@ -13,25 +13,31 @@ import {
   permissions,
   rolePermissions,
   roles,
+  taxes,
   users,
 } from './schema';
 
-const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  root: 'Superusuario del sistema',
   admin: 'Acceso total al sistema',
   vendedor: 'Crea ventas y gestiona clientes',
   almacen: 'Gestiona productos, compras e inventario',
   cajero: 'Registra ventas y consulta caja',
 };
 
+/** Categorías de repuestos de A/C automotriz (lista plana), con abreviatura para el SKU. */
 const SEED_CATEGORIES = [
-  'Frenos',
-  'Suspensión',
-  'Motor',
-  'Eléctrico',
-  'Filtros',
-  'Correas',
-  'Lubricantes',
-  'Carrocería',
+  { name: 'Compresores', abbreviation: 'COMP' },
+  { name: 'Condensadores', abbreviation: 'COND' },
+  { name: 'Evaporadores', abbreviation: 'EVA' },
+  { name: 'Válvulas', abbreviation: 'VAL' },
+  { name: 'Secadores', abbreviation: 'SEC' },
+  { name: 'Blower', abbreviation: 'BLO' },
+  { name: 'Filtros', abbreviation: 'FIL' },
+  { name: 'Mangueras', abbreviation: 'MAN' },
+  { name: 'Kits de Sellos', abbreviation: 'KIT' },
+  { name: 'Refrigerantes', abbreviation: 'REF' },
+  { name: 'Otros', abbreviation: 'OTR' },
 ];
 
 const SEED_BRANDS = ['Bosch', 'Gates', 'NGK', 'Monroe', 'Wix', 'ACDelco', 'Valeo'];
@@ -75,20 +81,20 @@ async function seed() {
       .onConflictDoNothing();
   }
 
-  // 4. Usuarios iniciales (admin y un vendedor para probar permisos)
+  // 4. Usuarios iniciales (root y admin). Solo se crean si no existen.
   const roleIdByName = new Map(dbRoles.map((r) => [r.name, r.id]));
   const seedUsers = [
     {
-      username: 'admin',
-      password: 'admin123',
-      fullName: 'Administrador del Sistema',
-      role: ROLES.ADMIN,
+      username: 'root',
+      password: 'Clave123*',
+      fullName: 'Root',
+      role: ROLES.ROOT,
     },
     {
-      username: 'vendedor1',
-      password: 'vendedor123',
-      fullName: 'Vendedor de Prueba',
-      role: ROLES.VENDEDOR,
+      username: 'admin',
+      password: 'Clave123*',
+      fullName: 'Administrador del Sistema',
+      role: ROLES.ADMIN,
     },
   ];
 
@@ -100,18 +106,25 @@ async function seed() {
       passwordHash: await bcrypt.hash(u.password, 10),
       fullName: u.fullName,
       roleId: roleIdByName.get(u.role)!,
+      // `Clave123*` está publicada en la documentación del repo: es provisional
+      // y el sistema obliga a cambiarla en el primer inicio de sesión.
+      mustChangePassword: true,
     });
     console.log(`  👤 Usuario creado: ${u.username} / ${u.password}`);
   }
 
   // 5. Catálogos base
-  await db
-    .insert(categories)
-    .values(SEED_CATEGORIES.map((name) => ({ name })))
-    .onConflictDoNothing();
+  await db.insert(categories).values(SEED_CATEGORIES).onConflictDoNothing();
+
   await db
     .insert(brands)
     .values(SEED_BRANDS.map((name) => ({ name })))
+    .onConflictDoNothing();
+
+  // 6. Impuestos: IVA 16%
+  await db
+    .insert(taxes)
+    .values([{ name: 'IVA', rate: '16' }])
     .onConflictDoNothing();
 
   console.log('✅ Seed completado');

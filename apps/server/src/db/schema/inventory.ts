@@ -1,4 +1,5 @@
 import {
+  bigint,
   index,
   integer,
   pgTable,
@@ -22,8 +23,8 @@ export const inventoryMovements = pgTable(
       .notNull()
       .references(() => products.id),
     movementType: movementTypeEnum('movement_type').notNull(),
-    quantity: integer('quantity').notNull(),
-    stockAfter: integer('stock_after').notNull(),
+    quantity: bigint('quantity', { mode: 'number' }).notNull(),
+    stockAfter: bigint('stock_after', { mode: 'number' }).notNull(),
     referenceType: varchar('reference_type', { length: 30 }),
     referenceId: integer('reference_id'),
     userId: integer('user_id')

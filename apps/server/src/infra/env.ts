@@ -26,9 +26,54 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16, 'JWT_REFRESH_SECRET muy corto'),
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('7d'),
+  /**
+   * `secure` de la cookie del refresh token. Si no se define, sigue a `NODE_ENV`.
+   * Sobre HTTP (producción accedida por IP, sin dominio ni TLS) debe ser `false`:
+   * con `secure: true` el navegador descarta la cookie y la sesión se corta
+   * al vencer el access token (15 min). Ponerlo en `true` al montar HTTPS.
+   *
+   * Se acepta vacío (`COOKIE_SECURE=` en el .env) como "no definido".
+   */
+  COOKIE_SECURE: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['true', 'false']).optional(),
+  ),
+
+  // --- Worker de tasa BCV automática ---
+  // Si RADAR_API_KEY está vacío, el worker no se activa (solo tasa manual).
+  //
+  // La URL NO lleva valor por defecto a propósito: el endpoint del proveedor es
+  // configuración de despliegue y vive en el `.env`, no incrustado en el código.
+  // Cuando Radar movió su dominio (sep. 2026) hubo que tocar un solo archivo
+  // por entorno; un default en el código habría tapado el `.env` desactualizado.
+  RADAR_API_URL: z.string().url('RADAR_API_URL debe ser una URL válida').optional(),
+  RADAR_API_KEY: z.string().default(''),
+  /** Hora local (HH:MM) de la consulta diaria automática a Radar. */
+  BCV_FETCH_TIME: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Formato HH:MM')
+    .default('00:30'),
+  /** Tasa de emergencia si no hay ninguna registrada en la BD. */
+  BCV_FALLBACK_RATE: z.coerce.number().positive().default(36),
 });
 
-const parsed = envSchema.safeParse(process.env);
+/**
+ * La URL de Radar solo hace falta si el worker va a correr. Se exige junto con
+ * la clave (y no siempre) para que un entorno sin tasas automáticas arranque
+ * igual, pero uno con clave y sin URL falle al arrancar y no en la primera
+ * consulta del día.
+ */
+const envSchemaChecked = envSchema.superRefine((v, ctx) => {
+  if (v.RADAR_API_KEY && !v.RADAR_API_URL) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['RADAR_API_URL'],
+      message: 'Requerida cuando hay RADAR_API_KEY (defínela en el .env)',
+    });
+  }
+});
+
+const parsed = envSchemaChecked.safeParse(process.env);
 
 if (!parsed.success) {
   console.error(`❌ Variables de entorno inválidas (archivo: ${envFile}):`);
@@ -40,5 +85,9 @@ if (!parsed.success) {
 export const env = parsed.data;
 export const isProd = env.NODE_ENV === 'production';
 export const isDev = env.NODE_ENV === 'development';
+/** `secure` efectivo de la cookie de refresh (env explícito o, si no, `isProd`). */
+export const cookieSecure = env.COOKIE_SECURE
+  ? env.COOKIE_SECURE === 'true'
+  : env.NODE_ENV === 'production';
 /** Archivo de entorno efectivamente cargado (útil para logs de arranque). */
 export const loadedEnvFile = envFile;

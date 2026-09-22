@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import type { LoginInput } from '@autopartes-air/shared';
+import type {
+  ChangePasswordInput,
+  LoginInput,
+  SetSecurityPinInput,
+  UpdateProfileInput,
+} from '@autopartes-air/shared';
 import * as authApi from '../api/auth.api';
 import { useAuthStore } from '../stores/auth.store';
 
@@ -20,6 +25,39 @@ export function useLogout() {
     mutationFn: () => authApi.logout(),
     // Limpiar siempre, aunque el logout del servidor falle.
     onSettled: () => clear(),
+  });
+}
+
+/** Actualiza el perfil propio y refresca el usuario en el store. */
+export function useUpdateProfile() {
+  const setUser = useAuthStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: (input: UpdateProfileInput) => authApi.updateProfile(input),
+    onSuccess: (user) => setUser(user),
+  });
+}
+
+/**
+ * Fija o cambia el PIN de autorización propio. Solo cambia `hasSecurityPin`
+ * del usuario en sesión: el PIN nunca llega al cliente.
+ */
+export function useSetSecurityPin() {
+  const setUser = useAuthStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: (input: SetSecurityPinInput) => authApi.setSecurityPin(input),
+    onSuccess: (user) => setUser(user),
+  });
+}
+
+/**
+ * Cambia la contraseña propia y guarda la sesión nueva que devuelve el
+ * servidor. Es lo que levanta el bloqueo de contraseña provisional.
+ */
+export function useChangePassword() {
+  const setSession = useAuthStore((s) => s.setSession);
+  return useMutation({
+    mutationFn: (input: ChangePasswordInput) => authApi.changePassword(input),
+    onSuccess: ({ accessToken, user }) => setSession(accessToken, user),
   });
 }
 
