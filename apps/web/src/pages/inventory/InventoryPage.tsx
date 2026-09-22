@@ -14,6 +14,7 @@ import { useMovements } from '../../hooks/useInventory';
 import { useAuthStore } from '../../stores/auth.store';
 import { AdjustmentModal } from './AdjustmentModal';
 import { formatDateTime } from '../../lib/datetime';
+import { DateTimeCell } from '../../components/DateTimeCell';
 
 const { Title, Text } = Typography;
 
@@ -39,8 +40,9 @@ export function InventoryPage() {
     {
       title: 'Fecha',
       dataIndex: 'createdAt',
-      width: 150,
-      render: (d: string) => formatDateTime(d),
+      width: 130,
+      align: 'center',
+      render: (d: string) => <DateTimeCell value={d} />,
     },
     {
       title: 'Producto',

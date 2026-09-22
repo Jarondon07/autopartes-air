@@ -27,6 +27,7 @@ import {
 import type { DebtRow } from '../../api/debts.api';
 import { DataTable } from '../../components/DataTable';
 import { formatDate, formatDateTime } from '../../lib/datetime';
+import { DateTimeCell } from '../../components/DateTimeCell';
 import { useClients } from '../../hooks/useClients';
 import { useDebt, useDebts, useDebtsSummary } from '../../hooks/useDebts';
 import { useAuthStore } from '../../stores/auth.store';
@@ -345,7 +346,8 @@ export function DebtsPage() {
                 {
                   title: 'Fecha',
                   dataIndex: 'paidAt',
-                  render: (d: string) => formatDateTime(d),
+                  align: 'center',
+                  render: (d: string) => <DateTimeCell value={d} />,
                 },
                 {
                   title: 'Método',

@@ -9,6 +9,7 @@ import { usePurchase, usePurchases } from '../../hooks/usePurchases';
 import { useAuthStore } from '../../stores/auth.store';
 import { PurchaseFormModal } from './PurchaseFormModal';
 import { formatDateTime } from '../../lib/datetime';
+import { DateTimeCell } from '../../components/DateTimeCell';
 
 const { Title, Text } = Typography;
 
@@ -32,8 +33,9 @@ export function PurchasesPage() {
     {
       title: 'Fecha',
       dataIndex: 'purchaseDate',
-      width: 150,
-      render: (d: string) => formatDateTime(d),
+      width: 130,
+      align: 'center',
+      render: (d: string) => <DateTimeCell value={d} />,
     },
     { title: 'Proveedor', dataIndex: 'supplierName' },
     {

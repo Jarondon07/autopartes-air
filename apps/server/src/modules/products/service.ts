@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
 import {
   UNIVERSAL_CAR_ABBR,
   buildProductSku,
@@ -205,8 +205,13 @@ export async function list(f: ProductFilters) {
 
   const [rows, countResult] = await Promise.all([
     db
-      .select()
+      // La marca del repuesto viaja con el listado (no solo su id): el cajero y
+      // la lista muestran "nombre + marca" para distinguir de un vistazo dos
+      // productos que se llaman igual. Resolverlo aquí y no en cada pantalla
+      // evita que cada cliente (web, escritorio) cargue el catálogo de marcas.
+      .select({ ...getTableColumns(products), brandName: brands.name })
       .from(products)
+      .leftJoin(brands, eq(brands.id, products.brandId))
       .where(where)
       .orderBy(asc(products.name))
       .limit(f.limit)
@@ -250,8 +255,9 @@ export async function search(q: string) {
 /** Productos activos cuyo stock es menor o igual a su stock mínimo. */
 export async function lowStock() {
   return db
-    .select()
+    .select({ ...getTableColumns(products), brandName: brands.name })
     .from(products)
+    .leftJoin(brands, eq(brands.id, products.brandId))
     .where(and(eq(products.isActive, true), lte(products.stock, products.minStock)))
     .orderBy(asc(products.stock));
 }

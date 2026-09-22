@@ -129,6 +129,12 @@ export interface Product {
   description: string | null;
   categoryId: number | null;
   brandId: number | null;
+  /**
+   * Nombre de la marca del repuesto, resuelto por el servidor en los listados.
+   * Se muestra junto al nombre ("Evaporador · Delphi") para diferenciar
+   * productos que se llaman igual. No viene en el detalle ni al crear/editar.
+   */
+  brandName?: string | null;
   carBrandId: number | null;
   /** Sirve para cualquier vehículo: sin marca ni modelos de carro. */
   isUniversal: boolean;

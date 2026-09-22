@@ -35,6 +35,7 @@ import {
   PAYMENT_METHODS_BY_CURRENCY,
   PAYMENT_METHOD_CURRENCY,
   PAYMENT_METHOD_LABELS,
+  formatProductName,
   formatUsd,
   round2,
 } from '@autopartes-air/shared';
@@ -445,7 +446,8 @@ export function CajeroPage() {
       render: (_, it) => (
         <span>
           <Link onClick={() => setDetailId(it.product.id)} title="Ver ficha del producto">
-            <Text strong>{it.product.code}</Text> — {it.product.name}
+            <Text strong>{it.product.code}</Text> —{' '}
+            {formatProductName(it.product.name, it.product.brandName)}
           </Link>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
@@ -606,7 +608,7 @@ export function CajeroPage() {
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              <Text strong>{p.code}</Text> — {p.name}
+                              <Text strong>{p.code}</Text> — {formatProductName(p.name, p.brandName)}
                             </div>
                             <Space size={6} wrap style={{ marginTop: 2 }}>
                               <Text strong>{formatUsd(priceUsd)}</Text>
@@ -698,7 +700,8 @@ export function CajeroPage() {
               mobileCard={(it) => ({
                 title: (
                   <Link onClick={() => setDetailId(it.product.id)}>
-                    <Text strong>{it.product.code}</Text> — {it.product.name}
+                    <Text strong>{it.product.code}</Text> —{' '}
+                    {formatProductName(it.product.name, it.product.brandName)}
                   </Link>
                 ),
                 subtitle: `stock: ${it.product.stock}`,

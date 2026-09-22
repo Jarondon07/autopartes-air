@@ -28,7 +28,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
 import { DataTable } from '../../components/DataTable';
-import { PERMISSIONS, formatUsd } from '@autopartes-air/shared';
+import { PERMISSIONS, formatProductName, formatUsd } from '@autopartes-air/shared';
 import type { ProductRow } from '../../api/products.api';
 import { getApiErrorMessage } from '../../api/client';
 import { categoryOptions } from '../../lib/categories';
@@ -115,7 +115,11 @@ export function ProductsPage() {
       width: 130,
       render: (code: string) => <Text strong>{code}</Text>,
     },
-    { title: 'Nombre', dataIndex: 'name' },
+    {
+      title: 'Nombre',
+      dataIndex: 'name',
+      render: (_: string, p) => formatProductName(p.name, p.brandName),
+    },
     {
       title: 'Categoría',
       dataIndex: 'categoryId',
@@ -301,7 +305,7 @@ export function ProductsPage() {
                 icon={<PictureOutlined />}
               />
             ),
-            title: p.name,
+            title: formatProductName(p.name, p.brandName),
             subtitle: (
               <>
                 <Text strong>{p.code}</Text>

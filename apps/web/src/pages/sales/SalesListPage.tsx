@@ -26,6 +26,7 @@ import { DataTable } from '../../components/DataTable';
 import { useSale, useSales, useVoidSale } from '../../hooks/useSales';
 import { useAuthStore } from '../../stores/auth.store';
 import { formatDateTime } from '../../lib/datetime';
+import { DateTimeCell } from '../../components/DateTimeCell';
 
 const { Title, Text } = Typography;
 
@@ -80,8 +81,9 @@ export function SalesListPage() {
     {
       title: 'Fecha',
       dataIndex: 'saleDate',
-      width: 150,
-      render: (d: string) => formatDateTime(d),
+      width: 130,
+      align: 'center',
+      render: (d: string) => <DateTimeCell value={d} />,
     },
     {
       title: 'Cliente',

@@ -9,14 +9,15 @@ import {
 import { Card, Col, Empty, List, Row, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { PERMISSIONS, formatUsd } from '@autopartes-air/shared';
+import { PERMISSIONS, formatProductName, formatUsd } from '@autopartes-air/shared';
 import { COLORS } from '../theme/tokens';
 import type { SaleRow } from '../api/sales.api';
 import { useLowStock, useProducts } from '../hooks/useProducts';
 import { useSales, useSalesSummary } from '../hooks/useSales';
 import { useCurrentRates } from '../hooks/useExchangeRates';
 import { useAuthStore } from '../stores/auth.store';
-import { formatDate, formatShortDateTime } from '../lib/datetime';
+import { formatDate } from '../lib/datetime';
+import { DateTimeCell } from '../components/DateTimeCell';
 import { useDebtsSummary } from '../hooks/useDebts';
 
 const { Title, Text } = Typography;
@@ -91,8 +92,9 @@ export function DashboardPage() {
     {
       title: 'Fecha',
       dataIndex: 'saleDate',
-      width: 130,
-      render: (d: string) => formatShortDateTime(d),
+      width: 120,
+      align: 'center',
+      render: (d: string) => <DateTimeCell value={d} />,
     },
     {
       title: 'Cliente',
@@ -220,7 +222,8 @@ export function DashboardPage() {
                     <List.Item.Meta
                       title={
                         <span>
-                          <Text strong>{p.code}</Text> — {p.name}
+                          <Text strong>{p.code}</Text>{' '}
+                          — {formatProductName(p.name, p.brandName)}
                         </span>
                       }
                       description={
